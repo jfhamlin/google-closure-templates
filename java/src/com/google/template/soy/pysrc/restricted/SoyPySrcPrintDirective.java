@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.restricted;
+package com.google.template.soy.pysrc.restricted;
 
 import com.google.template.soy.shared.restricted.SoyPrintDirective;
 
@@ -22,20 +22,20 @@ import java.util.List;
 
 
 /**
- * Interface for a Soy print directive implemented for the JS Source backend.
+ * Interface for a Soy print directive implemented for the Python Source backend.
  *
  * <p> Important: This may only be used in implementing print directive plugins.
  *
  * @author Kai Huang
  */
-public interface SoyJsSrcPrintDirective extends SoyPrintDirective {
+public interface SoyPySrcPrintDirective extends SoyPrintDirective {
 
 
   /**
    * Applies this directive on the given string value.
    *
    * <p> Important note when implementing this method: The string value may not yet have been
-   * coerced to a string. You may need to explicitly coerce it to a string using the JS function
+   * coerced to a string. You may need to explicitly coerce it to a string using the Python function
    * {@code String()}.
    *
    * @param str The string value to apply the directive on. This value may not yet have been
@@ -43,6 +43,6 @@ public interface SoyJsSrcPrintDirective extends SoyPrintDirective {
    * @param args The directive's arguments, if any (usually none).
    * @return The resulting value.
    */
-  public JsExpr applyForJsSrc(JsExpr str, List<JsExpr> args);
+  public PyExpr applyForPySrc(PyExpr str, List<PyExpr> args);
   
 }

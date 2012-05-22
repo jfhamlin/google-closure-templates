@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
@@ -23,7 +23,7 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.template.soy.base.BaseUtils;
 import com.google.template.soy.base.SoySyntaxException;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
 import com.google.template.soy.msgs.SoyMsgBundle;
 import com.google.template.soy.msgs.internal.InsertMsgsVisitor;
 import com.google.template.soy.shared.internal.ApiCallScopeUtils;
@@ -42,65 +42,50 @@ import javax.annotation.Nullable;
 
 
 /**
- * Main entry point for the JS Src backend (output target).
+ * Main entry point for the Python Src backend (output target).
  *
  * <p> Important: Do not use outside of Soy code (treat as superpackage-private).
  *
  * @author Kai Huang
  */
-public class JsSrcMain {
+public class PySrcMain {
 
 
   /** The scope object that manages the API call scope. */
   private final GuiceSimpleScope apiCallScope;
 
-  /** Provider for getting an instance of ReplaceMsgsWithGoogMsgsVisitor. */
-  private final Provider<ReplaceMsgsWithGoogMsgsVisitor> replaceMsgsWithGoogMsgsVisitorProvider;
-
-  /** Provider for getting an instance of OptimizeBidiCodeGenVisitor. */
-  private final Provider<OptimizeBidiCodeGenVisitor> optimizeBidiCodeGenVisitorProvider;
-
-  /** Provider for getting an instance of GenJsCodeVisitor. */
-  private final Provider<GenJsCodeVisitor> genJsCodeVisitorProvider;
-
+  /** Provider for getting an instance of GenPyCodeVisitor. */
+  private final Provider<GenPyCodeVisitor> genPyCodeVisitorProvider;
 
   /**
    * @param apiCallScope The scope object that manages the API call scope.
-   * @param replaceMsgsWithGoogMsgsVisitorProvider Provider for getting an instance of
-   *     ReplaceMsgsWithGoogMsgsVisitor.
-   * @param optimizeBidiCodeGenVisitorProvider Provider for getting an instance of
-   *     OptimizeBidiCodeGenVisitor.
-   * @param genJsCodeVisitorProvider Provider for getting an instance of GenJsCodeVisitor.
+   * @param genPyCodeVisitorProvider Provider for getting an instance of GenPyCodeVisitor.
    */
   @Inject
-  JsSrcMain(@ApiCall GuiceSimpleScope apiCallScope,
-            Provider<ReplaceMsgsWithGoogMsgsVisitor> replaceMsgsWithGoogMsgsVisitorProvider,
-            Provider<OptimizeBidiCodeGenVisitor> optimizeBidiCodeGenVisitorProvider,
-            Provider<GenJsCodeVisitor> genJsCodeVisitorProvider) {
+  PySrcMain(@ApiCall GuiceSimpleScope apiCallScope,
+            Provider<GenPyCodeVisitor> genPyCodeVisitorProvider) {
     this.apiCallScope = apiCallScope;
-    this.replaceMsgsWithGoogMsgsVisitorProvider = replaceMsgsWithGoogMsgsVisitorProvider;
-    this.optimizeBidiCodeGenVisitorProvider = optimizeBidiCodeGenVisitorProvider;
-    this.genJsCodeVisitorProvider = genJsCodeVisitorProvider;
+    this.genPyCodeVisitorProvider = genPyCodeVisitorProvider;
   }
 
 
   /**
-   * Generates JS source code given a Soy parse tree, an options object, and an optional bundle of
+   * Generates Python source code given a Soy parse tree, an options object, and an optional bundle of
    * translated messages.
    *
-   * @param soyTree The Soy parse tree to generate JS source code for.
-   * @param jsSrcOptions The compilation options relevant to this backend.
+   * @param soyTree The Soy parse tree to generate Python source code for.
+   * @param pySrcOptions The compilation options relevant to this backend.
    * @param msgBundle The bundle of translated messages, or null to use the messages from the Soy
    *     source.
-   * @return A list of strings where each string represents the JS source code that belongs in one
-   *     JS file. The generated JS files correspond one-to-one to the original Soy source files.
+   * @return A list of strings where each string represents the Python source code that belongs in one
+   *     Python file. The generated Python files correspond one-to-one to the original Soy source files.
    * @throws SoySyntaxException If a syntax error is found.
    */
-  public List<String> genJsSrc(
-      SoyFileSetNode soyTree, SoyJsSrcOptions jsSrcOptions, @Nullable SoyMsgBundle msgBundle)
+  public List<String> genPySrc(
+      SoyFileSetNode soyTree, SoyPySrcOptions pySrcOptions, @Nullable SoyMsgBundle msgBundle)
       throws SoySyntaxException {
 
-    if (jsSrcOptions.shouldAllowDeprecatedSyntax()) {
+    if (pySrcOptions.shouldAllowDeprecatedSyntax()) {
       // Passes that we only want to run if allowing V1 syntax.
       (new RemoveHtmlCommentsVisitor()).exec(soyTree);
       (new CheckSoyDocVisitor(false)).exec(soyTree);
@@ -114,24 +99,21 @@ public class JsSrcMain {
     apiCallScope.enter();
     try {
       // Seed the scoped parameters.
-      apiCallScope.seed(SoyJsSrcOptions.class, jsSrcOptions);
+      apiCallScope.seed(SoyPySrcOptions.class, pySrcOptions);
       ApiCallScopeUtils.seedSharedParams(
-          apiCallScope, msgBundle, jsSrcOptions.getBidiGlobalDir());
+          apiCallScope, msgBundle, pySrcOptions.getBidiGlobalDir());
 
       // Replace MsgNodes.
-      if (jsSrcOptions.shouldGenerateGoogMsgDefs()) {
-        replaceMsgsWithGoogMsgsVisitorProvider.get().exec(soyTree);
-        (new MoveGoogMsgNodesEarlierVisitor()).exec(soyTree);
+      if (pySrcOptions.shouldGenerateGoogMsgDefs()) {
         Preconditions.checkState(
-            jsSrcOptions.getBidiGlobalDir() != 0,
+            pySrcOptions.getBidiGlobalDir() != 0,
             "If enabling shouldGenerateGoogMsgDefs, must also set bidiGlobalDir.");
       } else {
         (new InsertMsgsVisitor(msgBundle)).exec(soyTree);
       }
 
       // Do the code generation.
-      optimizeBidiCodeGenVisitorProvider.get().exec(soyTree);
-      return genJsCodeVisitorProvider.get().exec(soyTree);
+      return genPyCodeVisitorProvider.get().exec(soyTree);
 
     } finally {
       apiCallScope.exit();
@@ -140,39 +122,39 @@ public class JsSrcMain {
 
 
   /**
-   * Generates JS source files given a Soy parse tree, an options object, an optional bundle of
+   * Generates Python source files given a Soy parse tree, an options object, an optional bundle of
    * translated messages, and information on where to put the output files.
    *
-   * @param soyTree The Soy parse tree to generate JS source code for.
-   * @param jsSrcOptions The compilation options relevant to this backend.
-   * @param locale The current locale that we're generating JS for, or null if not applicable.
+   * @param soyTree The Soy parse tree to generate Python source code for.
+   * @param pySrcOptions The compilation options relevant to this backend.
+   * @param locale The current locale that we're generating Python for, or null if not applicable.
    * @param msgBundle The bundle of translated messages, or null to use the messages from the Soy
    *     source.
    * @param outputPathFormat The format string defining how to build the output file path
    *     corresponding to an input file path.
    * @param inputPathsPrefix The input path prefix, or empty string if none.
    * @throws SoySyntaxException If a syntax error is found.
-   * @throws IOException If there is an error in opening/writing an output JS file.
+   * @throws IOException If there is an error in opening/writing an output Python file.
    */
-  public void genJsFiles(
-      SoyFileSetNode soyTree, SoyJsSrcOptions jsSrcOptions, @Nullable String locale,
+  public void genPyFiles(
+      SoyFileSetNode soyTree, SoyPySrcOptions pySrcOptions, @Nullable String locale,
       @Nullable SoyMsgBundle msgBundle, String outputPathFormat, String inputPathsPrefix)
       throws SoySyntaxException, IOException {
 
-    List<String> jsFileContents = genJsSrc(soyTree, jsSrcOptions, msgBundle);
+    List<String> pyFileContents = genPySrc(soyTree, pySrcOptions, msgBundle);
 
     int numFiles = soyTree.numChildren();
-    if (numFiles != jsFileContents.size()) {
+    if (numFiles != pyFileContents.size()) {
       throw new AssertionError();
     }
 
     for (int i = 0; i < numFiles; i++) {
       String inputFilePath = soyTree.getChild(i).getFilePath();
       String outputFilePath =
-          JsSrcUtils.buildFilePath(outputPathFormat, locale, inputFilePath, inputPathsPrefix);
+          PySrcUtils.buildFilePath(outputPathFormat, locale, inputFilePath, inputPathsPrefix);
 
       BaseUtils.ensureDirsExistInPath(outputFilePath);
-      Files.write(jsFileContents.get(i), new File(outputFilePath), Charsets.UTF_8);
+      Files.write(pyFileContents.get(i), new File(outputFilePath), Charsets.UTF_8);
     }
   }
 

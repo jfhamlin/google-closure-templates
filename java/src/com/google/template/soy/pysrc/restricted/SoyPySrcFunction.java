@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.restricted;
+package com.google.template.soy.pysrc.restricted;
 
 import com.google.template.soy.shared.restricted.SoyFunction;
 
@@ -22,21 +22,21 @@ import java.util.List;
 
 
 /**
- * Interface for a Soy function implemented for the JS Source backend.
+ * Interface for a Soy function implemented for the Python Source backend.
  *
  * <p> Important: This may only be used in implementing function plugins.
  *
  * @author Kai Huang
  */
-public interface SoyJsSrcFunction extends SoyFunction {
+public interface SoyPySrcFunction extends SoyFunction {
 
 
   /**
-   * Computes this function on the given arguments for the JS Source backend. 
+   * Computes this function on the given arguments for the Python Source backend. 
    *
    * @param args The function arguments.
    * @return The computed result of this function.
    */
-  public JsExpr computeForJsSrc(List<JsExpr> args);
+  public PyExpr computeForPySrc(List<PyExpr> args);
 
 }

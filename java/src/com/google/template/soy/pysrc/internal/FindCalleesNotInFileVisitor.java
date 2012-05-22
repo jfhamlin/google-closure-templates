@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.collect.Sets;
 import com.google.template.soy.soytree.AbstractSoyNodeVisitor;

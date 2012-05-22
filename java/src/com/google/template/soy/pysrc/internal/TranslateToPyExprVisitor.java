@@ -14,14 +14,16 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
 import com.google.template.soy.base.SoySyntaxException;
+import com.google.template.soy.data.restricted.BooleanData;
 import com.google.template.soy.exprtree.AbstractExprNodeVisitor;
+import com.google.template.soy.exprtree.BooleanNode;
 import com.google.template.soy.exprtree.DataRefIndexNode;
 import com.google.template.soy.exprtree.DataRefKeyNode;
 import com.google.template.soy.exprtree.DataRefNode;
@@ -36,9 +38,9 @@ import com.google.template.soy.exprtree.OperatorNodes.AndOpNode;
 import com.google.template.soy.exprtree.OperatorNodes.NotOpNode;
 import com.google.template.soy.exprtree.OperatorNodes.OrOpNode;
 import com.google.template.soy.exprtree.StringNode;
-import com.google.template.soy.jssrc.restricted.JsExpr;
-import com.google.template.soy.jssrc.restricted.SoyJsCodeUtils;
-import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPyCodeUtils;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.shared.internal.ImpureFunction;
 
 import java.util.ArrayDeque;
@@ -49,59 +51,59 @@ import java.util.Map;
 
 /**
  * Visitor for translating a Soy expression (in the form of an {@code ExprNode}) into an
- * equivalent JS expression.
+ * equivalent Python expression.
  *
  * <p> Important: Do not use outside of Soy code (treat as superpackage-private).
  *
  * @author Kai Huang
  */
-public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
+public class TranslateToPyExprVisitor extends AbstractExprNodeVisitor<PyExpr> {
 
 
   /**
    * Injectable factory for creating an instance of this class.
    */
-  public static interface TranslateToJsExprVisitorFactory {
+  public static interface TranslateToPyExprVisitorFactory {
 
     /**
-     * @param localVarTranslations The current stack of replacement JS expressions for the local
+     * @param localVarTranslations The current stack of replacement Python expressions for the local
      *     variables (and foreach-loop special functions) current in scope.
      */
-    public TranslateToJsExprVisitor create(Deque<Map<String, JsExpr>> localVarTranslations);
+    public TranslateToPyExprVisitor create(Deque<Map<String, PyExpr>> localVarTranslations);
   }
 
 
-  /** Map of all SoyJsSrcFunctions (name to function). */
-  private final Map<String, SoyJsSrcFunction> soyJsSrcFunctionsMap;
+  /** Map of all SoyPySrcFunctions (name to function). */
+  private final Map<String, SoyPySrcFunction> soyPySrcFunctionsMap;
 
-  /** The current stack of replacement JS expressions for the local variables (and foreach-loop
+  /** The current stack of replacement Python expressions for the local variables (and foreach-loop
    *  special functions) current in scope. */
-  private final Deque<Map<String, JsExpr>> localVarTranslations;
+  private final Deque<Map<String, PyExpr>> localVarTranslations;
 
   /** Stack of partial results (during a pass). */
-  private Deque<JsExpr> resultStack;
+  private Deque<PyExpr> resultStack;
 
 
   /**
-   * @param soyJsSrcFunctionsMap Map of all SoyJsSrcFunctions (name to function).
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param soyPySrcFunctionsMap Map of all SoyPySrcFunctions (name to function).
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
    */
   @AssistedInject
-  TranslateToJsExprVisitor(
-      Map<String, SoyJsSrcFunction> soyJsSrcFunctionsMap,
-      @Assisted Deque<Map<String, JsExpr>> localVarTranslations) {
-    this.soyJsSrcFunctionsMap = soyJsSrcFunctionsMap;
+  TranslateToPyExprVisitor(
+      Map<String, SoyPySrcFunction> soyPySrcFunctionsMap,
+      @Assisted Deque<Map<String, PyExpr>> localVarTranslations) {
+    this.soyPySrcFunctionsMap = soyPySrcFunctionsMap;
     this.localVarTranslations = localVarTranslations;
   }
 
 
   @Override protected void setup() {
-    resultStack = new ArrayDeque<JsExpr>();
+    resultStack = new ArrayDeque<PyExpr>();
   }
 
 
-  @Override protected JsExpr getResult() {
+  @Override protected PyExpr getResult() {
     return resultStack.peek();
   }
 
@@ -119,15 +121,20 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
   // Implementations for primitives and data references (concrete classes).
 
 
+  @Override protected void visitInternal(BooleanNode node) {
+    resultStack.push(new PyExpr(node.getValue() ? "True" : "False", Integer.MAX_VALUE));
+  }
+
+
   @Override protected void visitInternal(StringNode node) {
 
-    // Note: StringNode.toSourceString() produces a Soy string, which is usually a valid JS string.
+    // Note: StringNode.toSourceString() produces a Soy string, which is usually a valid Python string.
     // The rare exception is a string containing a Unicode Format character (Unicode category "Cf")
     // because of the JavaScript language quirk that requires all category "Cf" characters to be
-    // escaped in JS strings. Therefore, we must call JsSrcUtils.escapeUnicodeFormatChars() on the
+    // escaped in Python strings. Therefore, we must call PySrcUtils.escapeUnicodeFormatChars() on the
     // result.
-    resultStack.push(new JsExpr(
-        JsSrcUtils.escapeUnicodeFormatChars(node.toSourceString()),
+    resultStack.push(new PyExpr("u" +
+        PySrcUtils.escapeUnicodeFormatChars(node.toSourceString()),
         Integer.MAX_VALUE));
   }
 
@@ -138,7 +145,7 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
 
     // ------ Translate the first part, which may be a variable or a data key ------
     String firstPart = ((DataRefKeyNode) node.getChild(0)).getKey();
-    JsExpr translation = getLocalVarTranslation(firstPart);
+    PyExpr translation = getLocalVarTranslation(firstPart);
     if (translation != null) {
       // Case 1: In-scope local var.
       exprTextSb.append(translation.getText());
@@ -164,12 +171,12 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
       }
     }
 
-    resultStack.push(new JsExpr(exprTextSb.toString(), Integer.MAX_VALUE));
+    resultStack.push(new PyExpr(exprTextSb.toString(), Integer.MAX_VALUE));
   }
 
 
   @Override protected void visitInternal(GlobalNode node) {
-    resultStack.push(new JsExpr(node.toSourceString(), Integer.MAX_VALUE));
+    resultStack.push(new PyExpr(node.toSourceString(), Integer.MAX_VALUE));
   }
 
 
@@ -181,17 +188,17 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
     // Note: Since we're using Soy syntax for the 'not' operator, we'll end up generating code with
     // a space between the token '!' and the subexpression that it negates. This isn't the usual
     // style, but it should be fine (besides, it's more readable with the extra space).
-    resultStack.push(genJsExprUsingSoySyntaxWithNewToken(node, "!"));
+    resultStack.push(genPyExprUsingSoySyntaxWithNewToken(node, "not"));
   }
 
 
   @Override protected void visitInternal(AndOpNode node) {
-    resultStack.push(genJsExprUsingSoySyntaxWithNewToken(node, "&&"));
+    resultStack.push(genPyExprUsingSoySyntaxWithNewToken(node, "and"));
   }
 
 
   @Override protected void visitInternal(OrOpNode node) {
-    resultStack.push(genJsExprUsingSoySyntaxWithNewToken(node, "||"));
+    resultStack.push(genPyExprUsingSoySyntaxWithNewToken(node, "or"));
   }
 
 
@@ -231,20 +238,20 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
     }
 
     // Handle pure functions.
-    SoyJsSrcFunction fn = soyJsSrcFunctionsMap.get(fnName);
+    SoyPySrcFunction fn = soyPySrcFunctionsMap.get(fnName);
     if (fn != null) {
       if (! fn.getValidArgsSizes().contains(numArgs)) {
         throw new SoySyntaxException(
             "Function '" + fnName + "' called with the wrong number of arguments" +
             " (function call \"" + node.toSourceString() + "\").");
       }
-      List<JsExpr> args = Lists.newArrayList();
+      List<PyExpr> args = Lists.newArrayList();
       for (ExprNode child : node.getChildren()) {
         visit(child);
         args.add(resultStack.pop());
       }
       try {
-        resultStack.push(fn.computeForJsSrc(args));
+        resultStack.push(fn.computeForPySrc(args));
       } catch (Exception e) {
         throw new SoySyntaxException(
             "Error in function call \"" + node.toSourceString() + "\": " + e.getMessage(), e);
@@ -254,7 +261,7 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
 
     // Function not found.
     throw new SoySyntaxException(
-        "Failed to find SoyJsSrcFunction with name '" + fnName + "'" +
+        "Failed to find SoyPySrcFunction with name '" + fnName + "'" +
         " (function call \"" + node.toSourceString() + "\").");
   }
 
@@ -278,7 +285,7 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
 
 
   private void visitHasDataFunction() {
-    resultStack.push(new JsExpr("opt_data != null", Operator.NOT_EQUAL.getPrecedence()));
+    resultStack.push(new PyExpr("opt_data != None", Operator.NOT_EQUAL.getPrecedence()));
   }
 
 
@@ -287,19 +294,19 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
 
 
   @Override protected void visitInternal(OperatorNode node) {
-    resultStack.push(genJsExprUsingSoySyntax(node));
+    resultStack.push(genPyExprUsingSoySyntax(node));
   }
 
 
   @Override protected void visitInternal(PrimitiveNode node) {
 
     // Note: ExprNode.toSourceString() technically returns a Soy expression. In the case of
-    // primitives, the result is usually also the correct JS expression.
+    // primitives, the result is usually also the correct Python expression.
     // Note: The rare exception to the above note is a StringNode containing a Unicode Format
     // character (Unicode category "Cf") because of the JavaScript language quirk that requires all
-    // category "Cf" characters to be escaped in JS strings. Therefore, we have a separate
+    // category "Cf" characters to be escaped in Python strings. Therefore, we have a separate
     // implementation above for visitInternal(StringNode).
-    resultStack.push(new JsExpr(node.toSourceString(), Integer.MAX_VALUE));
+    resultStack.push(new PyExpr(node.toSourceString(), Integer.MAX_VALUE));
   }
 
 
@@ -313,10 +320,10 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
    * @param ident The Soy local variable to translate.
    * @return The translated expression for the given variable, or null if not found.
    */
-  private JsExpr getLocalVarTranslation(String ident) {
+  private PyExpr getLocalVarTranslation(String ident) {
 
-    for (Map<String, JsExpr> localVarTranslationsFrame : localVarTranslations) {
-      JsExpr translation = localVarTranslationsFrame.get(ident);
+    for (Map<String, PyExpr> localVarTranslationsFrame : localVarTranslations) {
+      PyExpr translation = localVarTranslationsFrame.get(ident);
       if (translation != null) {
         return translation;
       }
@@ -327,49 +334,45 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
 
 
   /**
-   * Generates a JS expression for the given OperatorNode's subtree assuming that the JS expression
+   * Generates a Python expression for the given OperatorNode's subtree assuming that the Python expression
    * for the operator uses the same syntax format as the Soy operator.
-   * @param opNode The OperatorNode whose subtree to generate a JS expression for.
-   * @return The generated JS expression.
+   * @param opNode The OperatorNode whose subtree to generate a Python expression for.
+   * @return The generated Python expression.
    */
-  private JsExpr genJsExprUsingSoySyntax(OperatorNode opNode) {
-    return genJsExprUsingSoySyntaxWithNewToken(opNode, null);
+  private PyExpr genPyExprUsingSoySyntax(OperatorNode opNode) {
+    return genPyExprUsingSoySyntaxWithNewToken(opNode, null);
   }
 
 
   /**
-   * Generates a JS expression for the given OperatorNode's subtree assuming that the JS expression
+   * Generates a Python expression for the given OperatorNode's subtree assuming that the Python expression
    * for the operator uses the same syntax format as the Soy operator, with the exception that the
-   * JS operator uses a different token (e.g. "!" instead of "not").
-   * @param opNode The OperatorNode whose subtree to generate a JS expression for.
-   * @param newToken The equivalent JS operator's token.
-   * @return The generated JS expression.
+   * Python operator uses a different token (e.g. "!" instead of "not").
+   * @param opNode The OperatorNode whose subtree to generate a Python expression for.
+   * @param newToken The equivalent Python operator's token.
+   * @return The generated Python expression.
    */
-  private JsExpr genJsExprUsingSoySyntaxWithNewToken(OperatorNode opNode, String newToken) {
+  private PyExpr genPyExprUsingSoySyntaxWithNewToken(OperatorNode opNode, String newToken) {
 
-    List<JsExpr> operandJsExprs = Lists.newArrayList();
+    List<PyExpr> operandPyExprs = Lists.newArrayList();
     for (ExprNode child : opNode.getChildren()) {
       visit(child);
-      operandJsExprs.add(resultStack.pop());
+      operandPyExprs.add(resultStack.pop());
     }
 
-    return SoyJsCodeUtils.genJsExprUsingSoySyntaxWithNewToken(
-        opNode.getOperator(), operandJsExprs, newToken);
+    return SoyPyCodeUtils.genPyExprUsingSoySyntaxWithNewToken(
+        opNode.getOperator(), operandPyExprs, newToken);
   }
 
 
   /**
    * Appends a key onto a data reference expression.
-   * Handles JS reserved words.
+   * Handles Python reserved words.
    * @param sb StringBuilder to append to.
    * @param key Key to append.
    */
   private void appendDataRefKey(StringBuilder sb, String key) {
-    if (JS_RESERVED_WORDS.contains(key)) {
-      sb.append("['").append(key).append("']");
-    } else {
-      sb.append(".").append(key);
-    }
+    sb.append("['").append(key).append("']");
   }
 
 
@@ -378,7 +381,7 @@ public class TranslateToJsExprVisitor extends AbstractExprNodeVisitor<JsExpr> {
    * be used as identifiers.  This list is from the ECMA-262 v5, section 7.6.1:
    * http://www.ecma-international.org/publications/files/drafts/tc39-2009-050.pdf
    */
-  private static final ImmutableSet<String> JS_RESERVED_WORDS = ImmutableSet.of(
+  private static final ImmutableSet<String> Python_RESERVED_WORDS = ImmutableSet.of(
       "break", "case", "catch", "class",
       "const", "continue", "debugger", "default", "delete", "do",
       "else", "enum", "export", "extends", "finally",

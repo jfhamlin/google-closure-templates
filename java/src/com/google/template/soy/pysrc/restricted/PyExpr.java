@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.restricted;
+package com.google.template.soy.pysrc.restricted;
 
 import com.google.common.base.Objects;
 
 
 /**
- * Value class to represent a JS expression. Includes the text of the expression as well as the
+ * Value class to represent a Python expression. Includes the text of the expression as well as the
  * precedence of the top-most operator.
  *
  * <p> Important: This class may only be used in implementing plugins (e.g. functions, directives).
  *
  * <p> Note that even though the precedence numbers we use are for Soy, the precedence ordering of
- * the Soy expression operators matches that of JS (as well as Java), so the precedence numbers are
- * correct when used for generating JS code as well.
+ * the Soy expression operators matches that of Python (as well as Java), so the precedence numbers are
+ * correct when used for generating Python code as well.
  *
  * @author Kai Huang
  */
-public class JsExpr {
+public class PyExpr {
 
 
-  /** The JS expression text. */
+  /** The Python expression text. */
   private final String text;
 
   /** The precedence of the top-most operator, or Integer.MAX_VALUE. */
@@ -42,16 +42,16 @@ public class JsExpr {
 
 
   /**
-   * @param text The JS expression text.
+   * @param text The Python expression text.
    * @param precedence The precedence of the top-most operator. Or Integer.MAX_VALUE.
    */
-  public JsExpr(String text, int precedence) {
+  public PyExpr(String text, int precedence) {
     this.text = text;
     this.precedence = precedence;
   }
 
 
-  /** Returns the JS expression text. */
+  /** Returns the Python expression text. */
   public String getText() {
     return text;
   }
@@ -71,7 +71,7 @@ public class JsExpr {
     if (other == null || this.getClass() != other.getClass()) {
       return false;
     }
-    JsExpr otherCast = (JsExpr) other;
+    PyExpr otherCast = (PyExpr) other;
     if (this.text.equals(otherCast.text)) {
       if (this.precedence != otherCast.precedence) {
         throw new AssertionError();  // if text is equal, precedence should also be equal

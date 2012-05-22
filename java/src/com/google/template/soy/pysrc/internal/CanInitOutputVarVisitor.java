@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.inject.Inject;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
-import com.google.template.soy.jssrc.SoyJsSrcOptions.CodeStyle;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.SoyPySrcOptions.CodeStyle;
 import com.google.template.soy.soytree.AbstractSoyNodeVisitor;
 import com.google.template.soy.soytree.CallNode;
 import com.google.template.soy.soytree.SoyNode;
@@ -38,26 +38,26 @@ import java.util.Deque;
 class CanInitOutputVarVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
-  /** The options for generating JS source code. */
-  private final SoyJsSrcOptions jsSrcOptions;
+  /** The options for generating Python source code. */
+  private final SoyPySrcOptions pySrcOptions;
 
-  /** The IsComputableAsJsExprsVisitor used by this instance (when needed). */
-  private final IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor;
+  /** The IsComputableAsPyExprsVisitor used by this instance (when needed). */
+  private final IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor;
 
   /** Stack of partial results (during run). */
   private Deque<Boolean> resultStack;
 
 
   /**
-   * @param jsSrcOptions The options for generating JS source code.
-   * @param isComputableAsJsExprsVisitor The IsComputableAsJsExprsVisitor used by this instance
+   * @param pySrcOptions The options for generating Python source code.
+   * @param isComputableAsPyExprsVisitor The IsComputableAsPyExprsVisitor used by this instance
    *     (when needed).
    */
   @Inject
-  CanInitOutputVarVisitor(SoyJsSrcOptions jsSrcOptions,
-                          IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor) {
-    this.jsSrcOptions = jsSrcOptions;
-    this.isComputableAsJsExprsVisitor = isComputableAsJsExprsVisitor;
+  CanInitOutputVarVisitor(SoyPySrcOptions pySrcOptions,
+                          IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor) {
+    this.pySrcOptions = pySrcOptions;
+    this.isComputableAsPyExprsVisitor = isComputableAsPyExprsVisitor;
   }
 
 
@@ -76,11 +76,11 @@ class CanInitOutputVarVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
   @Override protected void visitInternal(CallNode node) {
-    // If we're generating code in the 'concat' style, then the call is a JS expression that returns
+    // If we're generating code in the 'concat' style, then the call is a Python expression that returns
     // its output as a string. However, if we're generating code in the 'stringbuilder' style, then
     // the call is a full statement that returns no value (instead, the output is directly appended
     // to the StringBuilder we pass to the callee).
-    resultStack.push(jsSrcOptions.getCodeStyle() == CodeStyle.CONCAT);
+    resultStack.push(pySrcOptions.getCodeStyle() == CodeStyle.CONCAT);
   }
 
 
@@ -90,8 +90,8 @@ class CanInitOutputVarVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
   @Override protected void visitInternal(SoyNode node) {
     // For the vast majority of nodes, the return value of this visitor should be the same as the
-    // return value of IsComputableAsJsExprsVisitor.
-    resultStack.push(isComputableAsJsExprsVisitor.exec(node));
+    // return value of IsComputableAsPyExprsVisitor.
+    resultStack.push(isComputableAsPyExprsVisitor.exec(node));
   }
 
 }

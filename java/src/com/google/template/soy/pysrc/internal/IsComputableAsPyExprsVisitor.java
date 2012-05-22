@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
-import com.google.template.soy.jssrc.SoyJsSrcOptions.CodeStyle;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.SoyPySrcOptions.CodeStyle;
 import com.google.template.soy.shared.internal.ApiCallScope;
 import com.google.template.soy.soytree.AbstractSoyNodeVisitor;
 import com.google.template.soy.soytree.CallNode;
@@ -38,8 +38,6 @@ import com.google.template.soy.soytree.SoyNode;
 import com.google.template.soy.soytree.SoyNode.ParentSoyNode;
 import com.google.template.soy.soytree.SwitchNode;
 import com.google.template.soy.soytree.TemplateNode;
-import com.google.template.soy.soytree.jssrc.GoogMsgNode;
-import com.google.template.soy.soytree.jssrc.GoogMsgRefNode;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -48,8 +46,8 @@ import java.util.Map;
 
 /**
  * Visitor to determine whether the output string for the subtree rooted at a given node is
- * computable as the concatenation of one or more JS expressions. If this is false, it means the
- * generated code for computing the node's output must include one or more full JS statements.
+ * computable as the concatenation of one or more Python expressions. If this is false, it means the
+ * generated code for computing the node's output must include one or more full Python statements.
  *
  * <p> Precondition: MsgNode should not exist in the tree.
  *
@@ -62,11 +60,11 @@ import java.util.Map;
  * @author Kai Huang
  */
 @ApiCallScope
-class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
+class IsComputableAsPyExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
-  /** The options for generating JS source code. */
-  private final SoyJsSrcOptions jsSrcOptions;
+  /** The options for generating Python source code. */
+  private final SoyPySrcOptions pySrcOptions;
 
   /** The memoized results of past visits to nodes. */
   private final Map<SoyNode, Boolean> memoizedResults;
@@ -76,11 +74,11 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
   /**
-   * @param jsSrcOptions The options for generating JS source code.
+   * @param pySrcOptions The options for generating Python source code.
    */
   @Inject
-  IsComputableAsJsExprsVisitor(SoyJsSrcOptions jsSrcOptions) {
-    this.jsSrcOptions = jsSrcOptions;
+  IsComputableAsPyExprsVisitor(SoyPySrcOptions pySrcOptions) {
+    this.pySrcOptions = pySrcOptions;
     memoizedResults = Maps.newHashMap();
   }
 
@@ -112,7 +110,7 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
   @Override protected void visitInternal(TemplateNode node) {
-    resultStack.push(areChildrenComputableAsJsExprs(node));
+    resultStack.push(areChildrenComputableAsPyExprs(node));
   }
 
 
@@ -121,18 +119,8 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
   }
 
 
-  @Override protected void visitInternal(GoogMsgNode node) {
-    resultStack.push(false);
-  }
-
-
-  @Override protected void visitInternal(GoogMsgRefNode node) {
-    resultStack.push(true);
-  }
-
-
   @Override protected void visitInternal(MsgHtmlTagNode node) {
-    resultStack.push(areChildrenComputableAsJsExprs(node));
+    resultStack.push(areChildrenComputableAsPyExprs(node));
   }
 
 
@@ -147,19 +135,19 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
   @Override protected void visitInternal(IfNode node) {
-    // If all children are computable as JS expressions, then this 'if' statement can be written
-    // as an expression as well, using the ternary conditional operator ("? :").
-    resultStack.push(areChildrenComputableAsJsExprs(node));
+    // If all children are computable as Python expressions, then this 'if' statement can be written
+    // as an expression as well, using the ternary conditional operator ("_ if _ else _").
+    resultStack.push(areChildrenComputableAsPyExprs(node));
   }
 
 
   @Override protected void visitInternal(IfCondNode node) {
-    resultStack.push(areChildrenComputableAsJsExprs(node));
+    resultStack.push(areChildrenComputableAsPyExprs(node));
   }
 
 
   @Override protected void visitInternal(IfElseNode node) {
-    resultStack.push(areChildrenComputableAsJsExprs(node));
+    resultStack.push(areChildrenComputableAsPyExprs(node));
   }
 
 
@@ -180,8 +168,8 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
   @Override protected void visitInternal(CallNode node) {
 
-    resultStack.push(jsSrcOptions.getCodeStyle() == CodeStyle.CONCAT &&
-                     areChildrenComputableAsJsExprs(node));
+    resultStack.push(pySrcOptions.getCodeStyle() == CodeStyle.CONCAT &&
+                     areChildrenComputableAsPyExprs(node));
   }
 
 
@@ -191,7 +179,7 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
 
   @Override protected void visitInternal(CallParamContentNode node) {
-    resultStack.push(areChildrenComputableAsJsExprs(node));
+    resultStack.push(areChildrenComputableAsPyExprs(node));
   }
 
 
@@ -201,11 +189,11 @@ class IsComputableAsJsExprsVisitor extends AbstractSoyNodeVisitor<Boolean> {
 
   /**
    * Private helper to check whether all children of a given parent node satisfy
-   * IsComputableAsJsExprsVisitor.
+   * IsComputableAsPyExprsVisitor.
    * @param node The parent node whose children to check.
-   * @return True if all children satisfy IsComputableAsJsExprsVisitor. 
+   * @return True if all children satisfy IsComputableAsPyExprsVisitor. 
    */
-  private boolean areChildrenComputableAsJsExprs(ParentSoyNode<? extends SoyNode> node) {
+  private boolean areChildrenComputableAsPyExprs(ParentSoyNode<? extends SoyNode> node) {
 
     for (SoyNode child : node.getChildren()) {
       // Note: Save time by not visiting RawTextNode and PrintNode children.

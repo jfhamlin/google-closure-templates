@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.template.soy.base.BaseUtils;
 
@@ -24,13 +24,13 @@ import javax.annotation.Nullable;
 
 
 /**
- * Shared utilities specific to the JS Src backend.
+ * Shared utilities specific to the Python Src backend.
  *
  * <p> Important: Do not use outside of Soy code (treat as superpackage-private).
  *
  * @author Kai Huang
  */
-public class JsSrcUtils {
+public class PySrcUtils {
 
 
   /**
@@ -92,7 +92,7 @@ public class JsSrcUtils {
    * category "Cf") changed to valid JavaScript Unicode escapes (i.e. &92;u####).
    */
   public static String escapeUnicodeFormatChars(String str) {
-    
+
     int len = str.length();
 
     // Do a quick check first, because most strings do not contain Unicode format characters.

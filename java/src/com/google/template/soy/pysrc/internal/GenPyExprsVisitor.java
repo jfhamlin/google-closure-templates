@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -28,9 +28,9 @@ import com.google.template.soy.exprparse.TokenMgrError;
 import com.google.template.soy.exprtree.ExprNode;
 import com.google.template.soy.exprtree.ExprRootNode;
 import com.google.template.soy.exprtree.Operator;
-import com.google.template.soy.jssrc.restricted.JsExpr;
-import com.google.template.soy.jssrc.restricted.JsExprUtils;
-import com.google.template.soy.jssrc.restricted.SoyJsSrcPrintDirective;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.PyExprUtils;
+import com.google.template.soy.pysrc.restricted.SoyPySrcPrintDirective;
 import com.google.template.soy.soytree.AbstractSoyNodeVisitor;
 import com.google.template.soy.soytree.CallNode;
 import com.google.template.soy.soytree.CallParamContentNode;
@@ -44,7 +44,6 @@ import com.google.template.soy.soytree.PrintNode;
 import com.google.template.soy.soytree.RawTextNode;
 import com.google.template.soy.soytree.SoyNode;
 import com.google.template.soy.soytree.TemplateNode;
-import com.google.template.soy.soytree.jssrc.GoogMsgRefNode;
 
 import java.util.Deque;
 import java.util.List;
@@ -52,7 +51,7 @@ import java.util.Map;
 
 
 /**
- * Visitor for generating JS expressions for parse tree nodes.
+ * Visitor for generating Python expressions for parse tree nodes.
  *
  * <p> Important: Do not use outside of Soy code (treat as superpackage-private).
  *
@@ -60,83 +59,83 @@ import java.util.Map;
  *
  * @author Kai Huang
  */
-public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
+public class GenPyExprsVisitor extends AbstractSoyNodeVisitor<List<PyExpr>> {
 
 
   /**
    * Injectable factory for creating an instance of this class.
    */
-  public static interface GenJsExprsVisitorFactory {
+  public static interface GenPyExprsVisitorFactory {
 
     /**
-     * @param localVarTranslations The current stack of replacement JS expressions for the local
+     * @param localVarTranslations The current stack of replacement Python expressions for the local
      *     variables (and foreach-loop special functions) current in scope.
      */
-    public GenJsExprsVisitor create(Deque<Map<String, JsExpr>> localVarTranslations);
+    public GenPyExprsVisitor create(Deque<Map<String, PyExpr>> localVarTranslations);
   }
 
 
-  /** Map of all SoyJsSrcPrintDirectives (name to directive). */
-  Map<String, SoyJsSrcPrintDirective> soyJsSrcDirectivesMap;
+  /** Map of all SoyPySrcPrintDirectives (name to directive). */
+  Map<String, SoyPySrcPrintDirective> soyPySrcDirectivesMap;
 
-  /** Instance of JsExprTranslator to use. */
-  private final JsExprTranslator jsExprTranslator;
+  /** Instance of PyExprTranslator to use. */
+  private final PyExprTranslator pyExprTranslator;
 
   /** Instance of GenCallCodeUtils to use. */
   private final GenCallCodeUtils genCallCodeUtils;
 
-  /** The IsComputableAsJsExprsVisitor used by this instance (when needed). */
-  private final IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor;
+  /** The IsComputableAsPyExprsVisitor used by this instance (when needed). */
+  private final IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor;
 
-  /** Factory for creating an instance of GenJsExprsVisitor. */
-  private final GenJsExprsVisitorFactory genJsExprsVisitorFactory;
+  /** Factory for creating an instance of GenPyExprsVisitor. */
+  private final GenPyExprsVisitorFactory genPyExprsVisitorFactory;
 
-  /** The current stack of replacement JS expressions for the local variables (and foreach-loop
+  /** The current stack of replacement Python expressions for the local variables (and foreach-loop
    *  special functions) current in scope. */
-  private final Deque<Map<String, JsExpr>> localVarTranslations;
+  private final Deque<Map<String, PyExpr>> localVarTranslations;
 
   /** List to collect the results. */
-  private List<JsExpr> jsExprs;
+  private List<PyExpr> pyExprs;
 
 
   /**
-   * @param soyJsSrcDirectivesMap Map of all SoyJsSrcPrintDirectives (name to directive).
-   * @param jsExprTranslator Instance of JsExprTranslator to use.
+   * @param soyPySrcDirectivesMap Map of all SoyPySrcPrintDirectives (name to directive).
+   * @param pyExprTranslator Instance of PyExprTranslator to use.
    * @param genCallCodeUtils Instance of GenCallCodeUtils to use.
-   * @param isComputableAsJsExprsVisitor The IsComputableAsJsExprsVisitor used by this instance
+   * @param isComputableAsPyExprsVisitor The IsComputableAsPyExprsVisitor used by this instance
    *     (when needed).
-   * @param genJsExprsVisitorFactory Factory for creating an instance of GenJsExprsVisitor.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param genPyExprsVisitorFactory Factory for creating an instance of GenPyExprsVisitor.
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
    */
   @AssistedInject
-  GenJsExprsVisitor(
-      Map<String, SoyJsSrcPrintDirective> soyJsSrcDirectivesMap, JsExprTranslator jsExprTranslator,
-      GenCallCodeUtils genCallCodeUtils, IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor,
-      GenJsExprsVisitorFactory genJsExprsVisitorFactory,
-      @Assisted Deque<Map<String, JsExpr>> localVarTranslations) {
-    this.soyJsSrcDirectivesMap = soyJsSrcDirectivesMap;
-    this.jsExprTranslator = jsExprTranslator;
+  GenPyExprsVisitor(
+      Map<String, SoyPySrcPrintDirective> soyPySrcDirectivesMap, PyExprTranslator pyExprTranslator,
+      GenCallCodeUtils genCallCodeUtils, IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor,
+      GenPyExprsVisitorFactory genPyExprsVisitorFactory,
+      @Assisted Deque<Map<String, PyExpr>> localVarTranslations) {
+    this.soyPySrcDirectivesMap = soyPySrcDirectivesMap;
+    this.pyExprTranslator = pyExprTranslator;
     this.genCallCodeUtils = genCallCodeUtils;
-    this.isComputableAsJsExprsVisitor = isComputableAsJsExprsVisitor;
-    this.genJsExprsVisitorFactory = genJsExprsVisitorFactory;
+    this.isComputableAsPyExprsVisitor = isComputableAsPyExprsVisitor;
+    this.genPyExprsVisitorFactory = genPyExprsVisitorFactory;
     this.localVarTranslations = localVarTranslations;
   }
 
 
-  @Override public List<JsExpr> exec(SoyNode node) {
-    Preconditions.checkArgument(isComputableAsJsExprsVisitor.exec(node));
+  @Override public List<PyExpr> exec(SoyNode node) {
+    Preconditions.checkArgument(isComputableAsPyExprsVisitor.exec(node));
     return super.exec(node);
   }
 
 
   @Override protected void setup() {
-    jsExprs = Lists.newArrayList();
+    pyExprs = Lists.newArrayList();
   }
 
 
-  @Override protected List<JsExpr> getResult() {
-    return jsExprs;
+  @Override protected List<PyExpr> getResult() {
+    return pyExprs;
   }
 
 
@@ -156,30 +155,19 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
    * </pre>
    * generates
    * <pre>
-   *   'I\'m feeling lucky!'
+   *   u'I\'m feeling lucky!'
    * </pre>
    */
   @Override protected void visitInternal(RawTextNode node) {
 
-    // Note: BaseUtils.escapeToSoyString() builds a Soy string, which is usually a valid JS string.
+    // Note: BaseUtils.escapeToSoyString() builds a Soy string, which is usually a valid Python string.
     // The rare exception is a string containing a Unicode Format character (Unicode category "Cf")
-    // because of the JavaScript language quirk that requires all category "Cf" characters to be
-    // escaped in JS strings. Therefore, we must call JsSrcUtils.escapeUnicodeFormatChars() on the
+    // because of the Python language quirk that requires all category "Cf" characters to be
+    // escaped in Python strings. Therefore, we must call PySrcUtils.escapeUnicodeFormatChars() on the
     // result.
     String exprText = BaseUtils.escapeToSoyString(node.getRawText(), false);
-    exprText = JsSrcUtils.escapeUnicodeFormatChars(exprText);
-    jsExprs.add(new JsExpr(exprText, Integer.MAX_VALUE));
-  }
-
-
-  /**
-   * Example:
-   * <pre>
-   *   MSG_UNNAMED_42
-   * </pre>
-   */
-  @Override protected void visitInternal(GoogMsgRefNode node) {
-    jsExprs.add(new JsExpr(node.getGoogMsgName(), Integer.MAX_VALUE));
+    exprText = PySrcUtils.escapeUnicodeFormatChars(exprText);
+    pyExprs.add(new PyExpr("u" + exprText, Integer.MAX_VALUE));
   }
 
 
@@ -212,17 +200,17 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
    */
   @Override protected void visitInternal(PrintNode node) {
 
-    JsExpr jsExpr = jsExprTranslator.translateToJsExpr(
+    PyExpr pyExpr = pyExprTranslator.translateToPyExpr(
         node.getExpr(), node.getExprText(), localVarTranslations);
 
     // Process directives.
     for (PrintDirectiveNode directiveNode : node.getChildren()) {
 
       // Get directive.
-      SoyJsSrcPrintDirective directive = soyJsSrcDirectivesMap.get(directiveNode.getName());
+      SoyPySrcPrintDirective directive = soyPySrcDirectivesMap.get(directiveNode.getName());
       if (directive == null) {
         throw new SoySyntaxException(
-            "Failed to find SoyJsSrcPrintDirective with name '" + directiveNode.getName() + "'" +
+            "Failed to find SoyPySrcPrintDirective with name '" + directiveNode.getName() + "'" +
             " (tag " + node.toSourceString() +")");
       }
 
@@ -235,16 +223,16 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
       }
 
       // Translate directive args.
-      List<JsExpr> argsJsExprs = Lists.newArrayListWithCapacity(args.size());
+      List<PyExpr> argsPyExprs = Lists.newArrayListWithCapacity(args.size());
       for (ExprRootNode<ExprNode> arg : args) {
-        argsJsExprs.add(jsExprTranslator.translateToJsExpr(arg, null, localVarTranslations));
+        argsPyExprs.add(pyExprTranslator.translateToPyExpr(arg, null, localVarTranslations));
       }
 
       // Apply directive.
-      jsExpr = directive.applyForJsSrc(jsExpr, argsJsExprs);
+      pyExpr = directive.applyForPySrc(pyExpr, argsPyExprs);
     }
 
-    jsExprs.add(jsExpr);
+    pyExprs.add(pyExpr);
   }
 
 
@@ -282,15 +270,15 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
         throw createExceptionForInvalidBase(baseText, pe);
       }
       
-      JsExpr baseJsExpr =
-          jsExprTranslator.translateToJsExpr(baseExpr, baseText, localVarTranslations);
-      sb.append(baseJsExpr.getText()).append(", ");
+      PyExpr basePyExpr =
+          pyExprTranslator.translateToPyExpr(baseExpr, baseText, localVarTranslations);
+      sb.append(basePyExpr.getText()).append(", ");
       selectorText = node.getCommandText().substring(delimPos + 1).trim();
     }
 
     sb.append("'").append(selectorText).append("')");
 
-    jsExprs.add(new JsExpr(sb.toString(), Integer.MAX_VALUE));
+    pyExprs.add(new PyExpr(sb.toString(), Integer.MAX_VALUE));
   }
 
   
@@ -320,15 +308,15 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
    * </pre>
    * might generate
    * <pre>
-   *   (opt_data.boo) ? AAA : (opt_data.foo) ? BBB : CCC
+   *   AAA if (opt_data['boo']) else BBB if (opt_data['foo']) else CCC
    * </pre>
    */
   @Override protected void visitInternal(IfNode node) {
 
-    // Create another instance of this visitor class for generating JS expressions from children.
-    GenJsExprsVisitor genJsExprsVisitor = genJsExprsVisitorFactory.create(localVarTranslations);
+    // Create another instance of this visitor class for generating Python expressions from children.
+    GenPyExprsVisitor genPyExprsVisitor = genPyExprsVisitorFactory.create(localVarTranslations);
 
-    StringBuilder jsExprTextSb = new StringBuilder();
+    StringBuilder pyExprTextSb = new StringBuilder();
 
     boolean hasElse = false;
     for (SoyNode child : node.getChildren()) {
@@ -336,21 +324,20 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
       if (child instanceof IfCondNode) {
         IfCondNode icn = (IfCondNode) child;
 
-        JsExpr condJsExpr = jsExprTranslator.translateToJsExpr(
+        PyExpr condPyExpr = pyExprTranslator.translateToPyExpr(
             icn.getExpr(), icn.getExprText(), localVarTranslations);
-        jsExprTextSb.append("(").append(condJsExpr.getText()).append(") ? ");
 
-        List<JsExpr> condBlockJsExprs = genJsExprsVisitor.exec(icn);
-        jsExprTextSb.append(JsExprUtils.concatJsExprs(condBlockJsExprs).getText());
+        List<PyExpr> condBlockPyExprs = genPyExprsVisitor.exec(icn);
+        pyExprTextSb.append(PyExprUtils.concatPyExprs(condBlockPyExprs).getText());
 
-        jsExprTextSb.append(" : ");
+        pyExprTextSb.append(" if (").append(condPyExpr.getText()).append(") else ");
 
       } else if (child instanceof IfElseNode) {
         hasElse = true;
         IfElseNode ien = (IfElseNode) child;
 
-        List<JsExpr> elseBlockJsExprs = genJsExprsVisitor.exec(ien);
-        jsExprTextSb.append(JsExprUtils.concatJsExprs(elseBlockJsExprs).getText());
+        List<PyExpr> elseBlockPyExprs = genPyExprsVisitor.exec(ien);
+        pyExprTextSb.append(PyExprUtils.concatPyExprs(elseBlockPyExprs).getText());
 
       } else {
         throw new AssertionError();
@@ -358,10 +345,10 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
     }
 
     if (!hasElse) {
-      jsExprTextSb.append("''");
+      pyExprTextSb.append("''");
     }
 
-    jsExprs.add(new JsExpr(jsExprTextSb.toString(), Operator.CONDITIONAL.getPrecedence()));
+    pyExprs.add(new PyExpr(pyExprTextSb.toString(), Operator.CONDITIONAL.getPrecedence()));
   }
 
 
@@ -391,12 +378,12 @@ public class GenJsExprsVisitor extends AbstractSoyNodeVisitor<List<JsExpr>> {
    * <pre>
    *   some.func(opt_data)
    *   some.func(opt_data.boo.foo)
-   *   some.func({goo: opt_data.moo})
-   *   some.func(soy.$$augmentData(opt_data.boo, {goo: 'Blah'}))
+   *   some.func({'goo': opt_data.moo})
+   *   some.func(soy.$$augmentData(opt_data.boo, {'goo': 'Blah'}))
    * </pre>
    */
   @Override protected void visitInternal(CallNode node) {
-    jsExprs.add(genCallCodeUtils.genCallExpr(node, localVarTranslations));
+    pyExprs.add(genCallCodeUtils.genCallExpr(node, localVarTranslations));
   }
 
 

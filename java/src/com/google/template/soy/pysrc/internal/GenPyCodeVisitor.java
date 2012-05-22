@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
@@ -28,11 +28,11 @@ import com.google.template.soy.base.SoySyntaxException;
 import com.google.template.soy.exprtree.ExprNode;
 import com.google.template.soy.exprtree.ExprRootNode;
 import com.google.template.soy.exprtree.Operator;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
-import com.google.template.soy.jssrc.SoyJsSrcOptions.CodeStyle;
-import com.google.template.soy.jssrc.internal.GenJsExprsVisitor.GenJsExprsVisitorFactory;
-import com.google.template.soy.jssrc.restricted.JsExpr;
-import com.google.template.soy.jssrc.restricted.JsExprUtils;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.SoyPySrcOptions.CodeStyle;
+import com.google.template.soy.pysrc.internal.GenPyExprsVisitor.GenPyExprsVisitorFactory;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.PyExprUtils;
 import com.google.template.soy.soytree.AbstractSoyNodeVisitor;
 import com.google.template.soy.soytree.CallNode;
 import com.google.template.soy.soytree.CallParamContentNode;
@@ -58,7 +58,6 @@ import com.google.template.soy.soytree.SwitchCaseNode;
 import com.google.template.soy.soytree.SwitchDefaultNode;
 import com.google.template.soy.soytree.SwitchNode;
 import com.google.template.soy.soytree.TemplateNode;
-import com.google.template.soy.soytree.jssrc.GoogMsgNode;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -73,17 +72,17 @@ import java.util.regex.Pattern;
 
 
 /**
- * Visitor for generating full JS code (i.e. statements) for parse tree nodes.
+ * Visitor for generating full Python code (i.e. statements) for parse tree nodes.
  *
  * <p> Precondition: MsgNode should not exist in the tree.
  *
- * <p> {@link #exec} should be called on a full parse tree. JS source code will be generated for
+ * <p> {@link #exec} should be called on a full parse tree. Python source code will be generated for
  * all the Soy files. The return value is a list of strings, each string being the content of one
- * generated JS file (corresponding to one Soy file).
+ * generated Python file (corresponding to one Soy file).
  *
  * @author Kai Huang
  */
-class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
+class GenPyCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
 
 
   /** Regex pattern to look for dots in a template name. */
@@ -96,64 +95,64 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
   private static final Pattern UNDERSCORE_NUMBER_SUFFIX = Pattern.compile("_[0-9]+$");
 
 
-  /** The options for generating JS source code. */
-  private final SoyJsSrcOptions jsSrcOptions;
+  /** The options for generating Python source code. */
+  private final SoyPySrcOptions pySrcOptions;
 
-  /** Instance of JsExprTranslator to use. */
-  private final JsExprTranslator jsExprTranslator;
+  /** Instance of PyExprTranslator to use. */
+  private final PyExprTranslator pyExprTranslator;
 
   /** Instance of GenCallCodeUtils to use. */
   private final GenCallCodeUtils genCallCodeUtils;
 
-  /** The IsComputableAsJsExprsVisitor used by this instance. */
-  private final IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor;
+  /** The IsComputableAsPyExprsVisitor used by this instance. */
+  private final IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor;
 
   /** The CanInitOutputVarVisitor used by this instance. */
   private final CanInitOutputVarVisitor canInitOutputVarVisitor;
 
-  /** Factory for creating an instance of GenJsExprsVisitor. */
-  private final GenJsExprsVisitorFactory genJsExprsVisitorFactory;
+  /** Factory for creating an instance of GenPyExprsVisitor. */
+  private final GenPyExprsVisitorFactory genPyExprsVisitorFactory;
 
-  /** The contents of the generated JS files. */
-  private List<String> jsFilesContents;
+  /** The contents of the generated Python files. */
+  private List<String> pyFilesContents;
 
-  /** The GenJsExprsVisitor used by this instance. */
-  @VisibleForTesting protected GenJsExprsVisitor genJsExprsVisitor;
+  /** The GenPyExprsVisitor used by this instance. */
+  @VisibleForTesting protected GenPyExprsVisitor genPyExprsVisitor;
 
-  /** The JsCodeBuilder to build the current JS file being generated (during a run). */
-  @VisibleForTesting protected JsCodeBuilder jsCodeBuilder;
+  /** The PyCodeBuilder to build the current Python file being generated (during a run). */
+  @VisibleForTesting protected PyCodeBuilder pyCodeBuilder;
 
-  /** The current stack of replacement JS expressions for the local variables (and foreach-loop
+  /** The current stack of replacement Python expressions for the local variables (and foreach-loop
    *  special functions) current in scope. */
-  @VisibleForTesting protected Deque<Map<String, JsExpr>> localVarTranslations;
+  @VisibleForTesting protected Deque<Map<String, PyExpr>> localVarTranslations;
 
 
   /**
-   * @param jsSrcOptions The options for generating JS source code.
-   * @param jsExprTranslator Instance of JsExprTranslator to use.
+   * @param pySrcOptions The options for generating Python source code.
+   * @param pyExprTranslator Instance of PyExprTranslator to use.
    * @param genCallCodeUtils Instance of GenCallCodeUtils to use.
-   * @param isComputableAsJsExprsVisitor The IsComputableAsJsExprsVisitor to be used.
+   * @param isComputableAsPyExprsVisitor The IsComputableAsPyExprsVisitor to be used.
    * @param canInitOutputVarVisitor The CanInitOutputVarVisitor to be used.
-   * @param genJsExprsVisitorFactory Factory for creating an instance of GenJsExprsVisitor.
+   * @param genPyExprsVisitorFactory Factory for creating an instance of GenPyExprsVisitor.
    */
   @Inject
-  GenJsCodeVisitor(SoyJsSrcOptions jsSrcOptions, JsExprTranslator jsExprTranslator,
+  GenPyCodeVisitor(SoyPySrcOptions pySrcOptions, PyExprTranslator pyExprTranslator,
                    GenCallCodeUtils genCallCodeUtils,
-                   IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor,
+                   IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor,
                    CanInitOutputVarVisitor canInitOutputVarVisitor,
-                   GenJsExprsVisitorFactory genJsExprsVisitorFactory) {
-    this.jsSrcOptions = jsSrcOptions;
-    this.jsExprTranslator = jsExprTranslator;
+                   GenPyExprsVisitorFactory genPyExprsVisitorFactory) {
+    this.pySrcOptions = pySrcOptions;
+    this.pyExprTranslator = pyExprTranslator;
     this.genCallCodeUtils = genCallCodeUtils;
-    this.isComputableAsJsExprsVisitor = isComputableAsJsExprsVisitor;
+    this.isComputableAsPyExprsVisitor = isComputableAsPyExprsVisitor;
     this.canInitOutputVarVisitor = canInitOutputVarVisitor;
-    this.genJsExprsVisitorFactory = genJsExprsVisitorFactory;
+    this.genPyExprsVisitorFactory = genPyExprsVisitorFactory;
   }
 
 
   @Override protected void setup() {
-    jsFilesContents = Lists.newArrayList();
-    jsCodeBuilder = null;
+    pyFilesContents = Lists.newArrayList();
+    pyCodeBuilder = null;
     localVarTranslations = null;
   }
 
@@ -165,7 +164,7 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
 
 
   @Override protected List<String> getResult() {
-    return jsFilesContents;
+    return pyFilesContents;
   }
 
 
@@ -174,24 +173,24 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
     // If the block is empty or if the first child cannot initilize the output var, we must
     // initialize the output var.
     if (node.numChildren() == 0 || !canInitOutputVarVisitor.exec(node.getChild(0))) {
-      jsCodeBuilder.initOutputVarIfNecessary();
+      pyCodeBuilder.initOutputVarIfNecessary();
     }
 
-    List<JsExpr> consecChildrenJsExprs = Lists.newArrayList();
+    List<PyExpr> consecChildrenPyExprs = Lists.newArrayList();
 
     for (SoyNode child : node.getChildren()) {
 
-      if (isComputableAsJsExprsVisitor.exec(child)) {
-        consecChildrenJsExprs.addAll(genJsExprsVisitor.exec(child));
+      if (isComputableAsPyExprsVisitor.exec(child)) {
+        consecChildrenPyExprs.addAll(genPyExprsVisitor.exec(child));
 
       } else {
-        // We've reached a child that is not computable as JS expressions.
+        // We've reached a child that is not computable as Python expressions.
 
-        // First add the JsExprs from preceding consecutive siblings that are computable as JS
+        // First add the PyExprs from preceding consecutive siblings that are computable as Python
         // expressions (if any).
-        if (consecChildrenJsExprs.size() > 0) {
-          jsCodeBuilder.addToOutputVar(consecChildrenJsExprs);
-          consecChildrenJsExprs.clear();
+        if (consecChildrenPyExprs.size() > 0) {
+          pyCodeBuilder.addToOutputVar(consecChildrenPyExprs);
+          consecChildrenPyExprs.clear();
         }
 
         // Now append the code for this child.
@@ -199,10 +198,10 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
       }
     }
 
-    // Add the JsExprs from the last few children (if any).
-    if (consecChildrenJsExprs.size() > 0) {
-      jsCodeBuilder.addToOutputVar(consecChildrenJsExprs);
-      consecChildrenJsExprs.clear();
+    // Add the PyExprs from the last few children (if any).
+    if (consecChildrenPyExprs.size() > 0) {
+      pyCodeBuilder.addToOutputVar(consecChildrenPyExprs);
+      consecChildrenPyExprs.clear();
     }
   }
 
@@ -226,8 +225,8 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
   /**
    * Example:
    * <pre>
-   * // This file was automatically generated from my-templates.soy.
-   * // Please don't edit this file by hand.
+   * # This file was automatically generated from my-templates.soy.
+   * # Please don't edit this file by hand.
    *
    * if (typeof boo == 'undefined') { var boo = {}; }
    * if (typeof boo.foo == 'undefined') { boo.foo = {}; }
@@ -237,25 +236,23 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    */
   @Override protected void visitInternal(SoyFileNode node) {
 
-    jsCodeBuilder = new JsCodeBuilder(jsSrcOptions.getCodeStyle());
+    pyCodeBuilder = new PyCodeBuilder(pySrcOptions.getCodeStyle());
 
-    jsCodeBuilder.appendLine("// This file was automatically generated from ",
+    pyCodeBuilder.appendLine("# This file was automatically generated from ",
                              node.getFileName(), ".");
-    jsCodeBuilder.appendLine("// Please don't edit this file by hand.");
+    pyCodeBuilder.appendLine("# Please don't edit this file by hand.");
 
-    // Add code to define JS namespaces or add provide/require calls for Closure Library.
-    jsCodeBuilder.appendLine();
-    if (jsSrcOptions.shouldProvideRequireSoyNamespaces()) {
-      addCodeToProvideRequireSoyNamespaces(node);
-    } else if (jsSrcOptions.shouldProvideRequireJsFunctions()) {
-      addCodeToProvideRequireJsFunctions(node);
-    } else {
-      addCodeToDefineJsNamespaces(node);
-    }
+    pyCodeBuilder.appendLine("def ___():");
+    pyCodeBuilder.increaseIndent();
+    pyCodeBuilder.appendLine("import pysoy");
+    pyCodeBuilder.appendLine("import math");
+    pyCodeBuilder.appendLine();
+    // Add code to define Python modules.
+    addCodeToDefinePyNamespaces(node);
 
     // Add code for each template.
     for (TemplateNode template : node.getChildren()) {
-      jsCodeBuilder.appendLine().appendLine();
+      pyCodeBuilder.appendLine().appendLine();
       try {
         visit(template);
       } catch (SoySyntaxException sse) {
@@ -263,33 +260,39 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
       }
     }
 
-    jsFilesContents.add(jsCodeBuilder.getCode());
-    jsCodeBuilder = null;
+    pyCodeBuilder.decreaseIndent();
+    pyCodeBuilder.appendLine("___()");
+    pyCodeBuilder.appendLine("del globals()['___']");
+
+    pyFilesContents.add(pyCodeBuilder.getCode());
+    pyCodeBuilder = null;
   }
 
 
   /**
-   * Helper for visitInternal(SoyFileNode) to add code to define JS namespaces.
+   * Helper for visitInternal(SoyFileNode) to add code to import required Python modules.
    * @param soyFile The node we're visiting.
    */
-  private void addCodeToDefineJsNamespaces(SoyFileNode soyFile) {
+  private void addCodeToDefinePyNamespaces(SoyFileNode soyFile) {
 
-    SortedSet<String> jsNamespaces = Sets.newTreeSet();
+    SortedSet<String> pyNamespaces = Sets.newTreeSet();
     for (TemplateNode template : soyFile.getChildren()) {
       String templateName = template.getTemplateName();
       Matcher dotMatcher = DOT.matcher(templateName);
       while (dotMatcher.find()) {
-        jsNamespaces.add(templateName.substring(0, dotMatcher.start()));
+        pyNamespaces.add(templateName.substring(0, dotMatcher.start()));
       }
     }
 
-    for (String jsNamespace : jsNamespaces) {
-      boolean hasDot = jsNamespace.indexOf('.') >= 0;
+    for (String pyNamespace : pyNamespaces) {
+      boolean hasDot = pyNamespace.indexOf('.') >= 0;
       // If this is a top level namespace and the option to declare top level
       // namespaces is turned off, skip declaring it.
-      if (jsSrcOptions.shouldDeclareTopLevelNamespaces() || hasDot) {
-        jsCodeBuilder.appendLine("if (typeof ", jsNamespace, " == 'undefined') { ",
-                                 (hasDot ? "" : "var "), jsNamespace, " = {}; }");
+      if (pySrcOptions.shouldDeclareTopLevelNamespaces() || hasDot) {
+        pyCodeBuilder.appendLine("pysoy.create_module('", pyNamespace, "')");
+      }
+      if (!hasDot) {
+          pyCodeBuilder.appendLine("import ", pyNamespace, " # import top-level namespace");
       }
     }
   }
@@ -301,13 +304,13 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    */
   private void addCodeToProvideRequireSoyNamespaces(SoyFileNode soyFile) {
 
-    jsCodeBuilder.appendLine("goog.provide('", soyFile.getNamespace(), "');");
+    pyCodeBuilder.appendLine("goog.provide('", soyFile.getNamespace(), "');");
 
-    jsCodeBuilder.appendLine();
+    pyCodeBuilder.appendLine();
 
-    jsCodeBuilder.appendLine("goog.require('soy');");
-    if (jsSrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER) {
-      jsCodeBuilder.appendLine("goog.require('soy.StringBuilder');");
+    pyCodeBuilder.appendLine("goog.require('soy');");
+    if (pySrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER) {
+      pyCodeBuilder.appendLine("goog.require('soy.StringBuilder');");
     }
     String prevCalleeNamespace = null;
     for (String calleeNotInFile : (new FindCalleesNotInFileVisitor()).exec(soyFile)) {
@@ -319,7 +322,7 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
       }
       String calleeNamespace = calleeNotInFile.substring(0, lastDotIndex);
       if (calleeNamespace.length() > 0 && !calleeNamespace.equals(prevCalleeNamespace)) {
-        jsCodeBuilder.appendLine("goog.require('", calleeNamespace, "');");
+        pyCodeBuilder.appendLine("goog.require('", calleeNamespace, "');");
         prevCalleeNamespace = calleeNamespace;
       }
     }
@@ -327,10 +330,10 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
 
 
   /**
-   * Helper for visitInternal(SoyFileNode) to add code to provide/require template JS functions.
+   * Helper for visitInternal(SoyFileNode) to add code to provide/require template Python functions.
    * @param soyFile The node we're visiting.
    */
-  private void addCodeToProvideRequireJsFunctions(SoyFileNode soyFile) {
+  private void addCodeToProvideRequirePyFunctions(SoyFileNode soyFile) {
 
     SortedSet<String> templateNames = Sets.newTreeSet();
     for (TemplateNode template : soyFile.getChildren()) {
@@ -340,17 +343,17 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
       templateNames.add(template.getTemplateName());
     }
     for (String templateName : templateNames) {
-      jsCodeBuilder.appendLine("goog.provide('", templateName, "');");
+      pyCodeBuilder.appendLine("goog.provide('", templateName, "');");
     }
 
-    jsCodeBuilder.appendLine();
+    pyCodeBuilder.appendLine();
 
-    jsCodeBuilder.appendLine("goog.require('soy');");
-    if (jsSrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER) {
-      jsCodeBuilder.appendLine("goog.require('soy.StringBuilder');");
+    pyCodeBuilder.appendLine("goog.require('soy');");
+    if (pySrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER) {
+      pyCodeBuilder.appendLine("goog.require('soy.StringBuilder');");
     }
     for (String calleeNotInFile : (new FindCalleesNotInFileVisitor()).exec(soyFile)) {
-      jsCodeBuilder.appendLine("goog.require('", calleeNotInFile, "');");
+      pyCodeBuilder.appendLine("goog.require('", calleeNotInFile, "');");
     }
   }
 
@@ -358,236 +361,86 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
   /**
    * Example:
    * <pre>
-   * my.func = function(opt_data, opt_sb) {
-   *   var output = opt_sb || new soy.StringBuilder();
+   * def myfunc(opt_data, opt_sb):
+   *   output = opt_sb or pysoy.StringBuilder();
    *   ...
    *   ...
-   *   if (!opt_sb) return output.toString();
-   * };
+   *   if not opt_sb:
+   *     return unicode(output)
    * </pre>
    */
   @Override protected void visitInternal(TemplateNode node) {
 
-    boolean isCodeStyleStringbuilder = jsSrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER;
+    boolean isCodeStyleStringbuilder = pySrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER;
 
-    localVarTranslations = new ArrayDeque<Map<String, JsExpr>>();
-    genJsExprsVisitor = genJsExprsVisitorFactory.create(localVarTranslations);
+    localVarTranslations = new ArrayDeque<Map<String, PyExpr>>();
+    genPyExprsVisitor = genPyExprsVisitorFactory.create(localVarTranslations);
 
-    if (jsSrcOptions.shouldGenerateJsdoc()) {
-      jsCodeBuilder.appendLine("/**");
-      jsCodeBuilder.appendLine(" * @param {Object.<string, *>=} opt_data");
-      if (isCodeStyleStringbuilder) {
-        jsCodeBuilder.appendLine(" * @param {soy.StringBuilder=} opt_sb");
-        jsCodeBuilder.appendLine(" * @return {string|undefined}");
-      } else {
-        jsCodeBuilder.appendLine(" * @return {string}");
-      }
-      jsCodeBuilder.appendLine(" * @notypecheck");
-      jsCodeBuilder.appendLine(" */");
-    }
+    String fullTemplateName = node.getTemplateName();
+    int lastDotIndex = fullTemplateName.lastIndexOf(".");
+    String parentName = fullTemplateName.substring(0, lastDotIndex);
+    String templateName = fullTemplateName.substring(lastDotIndex + 1, fullTemplateName.length());
+    pyCodeBuilder.appendLine("@pysoy.add_to_module('", parentName, "')");
 
     if (isCodeStyleStringbuilder) {
-      jsCodeBuilder.appendLine(node.getTemplateName(), " = function(opt_data, opt_sb) {");
+      pyCodeBuilder.appendLine("def ", templateName, "(opt_data = None, opt_sb = None):");
     } else {
-      jsCodeBuilder.appendLine(node.getTemplateName(), " = function(opt_data) {");
+      pyCodeBuilder.appendLine("def ", templateName, "(opt_data = None):");
     }
-    jsCodeBuilder.increaseIndent();
-    localVarTranslations.push(Maps.<String, JsExpr>newHashMap());
+    pyCodeBuilder.increaseIndent();
 
-    if (!isCodeStyleStringbuilder && isComputableAsJsExprsVisitor.exec(node)) {
-      // Case 1: The code style is 'concat' and the whole template body can be represented as JS
+    if (pySrcOptions.shouldGeneratePydoc()) {
+      pyCodeBuilder.appendLine("'''");
+      pyCodeBuilder.appendLine("param opt_data -- A dict of the data provided to the template.");
+      if (isCodeStyleStringbuilder) {
+        pyCodeBuilder.appendLine("param opt_sb -- A soy.StringBuilder used to compose the output.");
+        pyCodeBuilder.appendLine();
+        pyCodeBuilder.appendLine("return A string of the template output if opt_sb is None, ",
+                                 "else None.");
+      } else {
+        pyCodeBuilder.appendLine();
+        pyCodeBuilder.appendLine("return A string of the template output.");
+      }
+      pyCodeBuilder.appendLine("'''");
+    }
+
+    pyCodeBuilder.appendLine("opt_data = pysoy.soy_dict(opt_data)");
+
+    localVarTranslations.push(Maps.<String, PyExpr>newHashMap());
+
+    if (!isCodeStyleStringbuilder && isComputableAsPyExprsVisitor.exec(node)) {
+      // Case 1: The code style is 'concat' and the whole template body can be represented as Python
       // expressions. We specially handle this case because we don't want to generate the variable
-      // 'output' at all. We simply concatenate the JS expressions and return the result.
+      // 'output' at all. We simply concatenate the Python expressions and return the result.
 
-      List<JsExpr> templateBodyJsExprs = genJsExprsVisitor.exec(node);
-      JsExpr templateBodyJsExpr = JsExprUtils.concatJsExprs(templateBodyJsExprs);
-      jsCodeBuilder.appendLine("return ", templateBodyJsExpr.getText(), ";");
+      List<PyExpr> templateBodyPyExprs = genPyExprsVisitor.exec(node);
+      PyExpr templateBodyPyExpr = PyExprUtils.concatPyExprs(templateBodyPyExprs);
+      pyCodeBuilder.appendLine("return ", templateBodyPyExpr.getText(), ";");
 
     } else {
       // Case 2: Normal case.
 
-      jsCodeBuilder.pushOutputVar("output");
+      pyCodeBuilder.pushOutputVar("output");
       if (isCodeStyleStringbuilder) {
-        jsCodeBuilder.appendLine("var output = opt_sb || new soy.StringBuilder();");
-        jsCodeBuilder.setOutputVarInited();
+        pyCodeBuilder.appendLine("output = opt_sb or pysoy.StringBuilder()");
+        pyCodeBuilder.setOutputVarInited();
       }
 
       visitChildren(node);
 
       if (isCodeStyleStringbuilder) {
-        jsCodeBuilder.appendLine("if (!opt_sb) return output.toString();");
+        pyCodeBuilder.appendLine("if not opt_sb:");
+        pyCodeBuilder.increaseIndent();
+        pyCodeBuilder.appendLine("return unicode(output)");
+        pyCodeBuilder.decreaseIndent();
       } else {
-        jsCodeBuilder.appendLine("return output;");
+        pyCodeBuilder.appendLine("return output;");
       }
-      jsCodeBuilder.popOutputVar();
+      pyCodeBuilder.popOutputVar();
     }
 
     localVarTranslations.pop();
-    jsCodeBuilder.decreaseIndent();
-    jsCodeBuilder.appendLine("};");
-  }
-
-
-  /**
-   * Example:
-   * <pre>{@literal
-   *   {msg desc="Link to help content."}Learn more{/msg}
-   *   {msg desc="Tells user how to access a product." hidden="true"}
-   *     Click <a href="{$url}">here</a> to access {$productName}.
-   *   {/msg}
-   * }</pre>
-   * might generate
-   * <pre>
-   *   /** @desc Link to help content. *{@literal /}
-   *   var MSG_UNNAMED_9 = goog.getMsg('Learn more');
-   *   /** @desc Tells user how to access a product.
-   *    *  @hidden *{@literal /}
-   *   var MSG_UNNAMED_10 = goog.getMsg(
-   *       'Click {$startLink}here{$endLink} to access {$productName}.',
-   *       {startLink: {@literal '<a href="' + opt_data.url + '">'},
-   *        endLink: {@literal '</a>'},
-   *        productName: opt_data.productName});
-   * </pre>
-   */
-  @Override protected void visitInternal(GoogMsgNode node) {
-
-    // Build the code for the message text and the individual code bits for each placeholder (i.e.
-    // "<placeholderName>: <exprCode>").
-    StringBuilder msgTextCodeSb = new StringBuilder();
-    List<String> placeholderCodeBits = new ArrayList<String>();
-    Set<String> seenPlaceholderNames = new HashSet<String>();
-
-    for (SoyNode child : node.getChildren()) {
-
-      if (child instanceof RawTextNode) {
-        // Only need to add to message text.
-        msgTextCodeSb.append(((RawTextNode) child).getRawText());
-
-      } else if (child instanceof MsgPlaceholderNode) {
-        String placeholderName = node.getPlaceholderName((MsgPlaceholderNode) child);
-        String googMsgPlaceholderName = genGoogMsgPlaceholderName(placeholderName);
-
-        // Add placeholder to message text.
-        msgTextCodeSb.append("{$").append(googMsgPlaceholderName).append("}");
-
-        // If the placeholder name has not already been seen, then this child must be its
-        // representative node. Add the code bit for the placeholder now.
-        if (!seenPlaceholderNames.contains(placeholderName)) {
-          seenPlaceholderNames.add(placeholderName);
-          String placeholderCodeBit =
-              "'" + googMsgPlaceholderName + "': " +
-              genGoogMsgPlaceholderExpr((MsgPlaceholderNode) child).getText();
-          placeholderCodeBits.add(placeholderCodeBit);
-        }
-
-      } else {
-        String nodeStringForErrorMsg =
-            (node instanceof SoyCommandNode) ? "Tag " + ((SoyCommandNode) node).getTagString() :
-            "Node " + node.toString();
-        throw new SoySyntaxException(
-            nodeStringForErrorMsg + " is not allowed to be a direct child of a 'msg' tag.");
-      }
-    }
-
-    String msgTextCode = BaseUtils.escapeToSoyString(msgTextCodeSb.toString(), false);
-    // Note: BaseUtils.escapeToSoyString() builds a Soy string, which is usually a valid JS string.
-    // The rare exception is a string containing a Unicode Format character (Unicode category "Cf")
-    // because of the JavaScript language quirk that requires all category "Cf" characters to be
-    // escaped in JS strings. Therefore, we must call JsSrcUtils.escapeUnicodeFormatChars() on the
-    // result.
-    msgTextCode = JsSrcUtils.escapeUnicodeFormatChars(msgTextCode);
-
-    // Finally, generate the code for the whole message definition.
-    jsCodeBuilder.indent().append("/** @desc ", node.getDesc());
-    if (node.isHidden()) {
-      jsCodeBuilder.append("\n");
-      jsCodeBuilder.indent().append(" *  @hidden");
-    }
-    jsCodeBuilder.append(" */\n");
-
-    jsCodeBuilder.indent().append("var ", node.getGoogMsgName(), " = goog.getMsg(");
-
-    if (placeholderCodeBits.size() == 0) {
-      // If no placeholders, we put the message text on the same line.
-      jsCodeBuilder.append(msgTextCode);
-    } else {
-      // If there are placeholders, we put the message text on a new line, indented 4 extra spaces.
-      // And we line up the placeholders too.
-      jsCodeBuilder.append("\n");
-      jsCodeBuilder.indent().append("    ", msgTextCode);
-      boolean isFirst = true;
-      for (String placeholderCodeBit : placeholderCodeBits) {
-        jsCodeBuilder.append(",\n");
-        if (isFirst) {
-          isFirst = false;
-          jsCodeBuilder.indent().append("    {");
-        } else {
-          jsCodeBuilder.indent().append("     ");
-        }
-        jsCodeBuilder.append(placeholderCodeBit);
-      }
-      jsCodeBuilder.append("}");
-    }
-
-    jsCodeBuilder.append(");\n");
-  }
-
-
-  /**
-   * Private helper for {@code visitInternal(GoogMsgNode)} to convert a placeholder name into a
-   * goog.getMsg placeholder name.
-   *
-   * A (standard) placeholder name has upper-underscore format. A goog.getMsg placeholder name must
-   * be lower-camelcase, possibly with an underscore-number suffix.
-   *
-   * @param placeholderName The placeholder name to convert.
-   * @return The generated goog.getMsg placeholder name for the given (standard) placeholder name.
-   */
-  private String genGoogMsgPlaceholderName(String placeholderName) {
-
-    Matcher suffixMatcher = UNDERSCORE_NUMBER_SUFFIX.matcher(placeholderName);
-    if (suffixMatcher.find()) {
-      String base = placeholderName.substring(0, suffixMatcher.start());
-      String suffix = suffixMatcher.group();
-      return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, base) + suffix;
-    } else {
-      return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, placeholderName);
-    }
-  }
-
-
-  /**
-   * Private helper for {@code visitInternal(GoogMsgNode)} to generate the JS expr for a given
-   * placeholder.
-   *
-   * @param msgPlaceholderNode The placeholder to generate the JS expr for.
-   * @return The JS expr for the given placeholder.
-   */
-  private JsExpr genGoogMsgPlaceholderExpr(MsgPlaceholderNode msgPlaceholderNode) {
-
-    if (msgPlaceholderNode instanceof MsgHtmlTagNode &&
-        !isComputableAsJsExprsVisitor.exec(msgPlaceholderNode)) {
-      // This is a MsgHtmlTagNode that is not computable as JS expressions. Visit it to
-      // generate code to define the 'htmlTag<n>' variable.
-      visit(msgPlaceholderNode);
-      return new JsExpr("htmlTag" + msgPlaceholderNode.getId(), Integer.MAX_VALUE);
-
-    } else if (msgPlaceholderNode instanceof CallNode) {
-      // If the CallNode has any CallParamContentNode children (i.e. this GoogMsgNode's
-      // grandchildren) that are not computable as JS expressions, visit them to generate code
-      // to define their respective 'param<n>' variables.
-      CallNode callNode = (CallNode) msgPlaceholderNode;
-      for (CallParamNode grandchild : callNode.getChildren()) {
-        if (grandchild instanceof CallParamContentNode &&
-            !isComputableAsJsExprsVisitor.exec(grandchild)) {
-          visit(grandchild);
-        }
-      }
-      return genCallCodeUtils.genCallExpr(callNode, localVarTranslations);
-
-    } else {
-      return JsExprUtils.concatJsExprs(genJsExprsVisitor.exec(msgPlaceholderNode));
-    }
+    pyCodeBuilder.decreaseIndent();
   }
 
 
@@ -611,21 +464,21 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    */
   @Override protected void visitInternal(MsgHtmlTagNode node) {
 
-    // This node should only be visited when it's not computable as JS expressions, because this
+    // This node should only be visited when it's not computable as Python expressions, because this
     // method just generates the code to define the temporary 'htmlTag<n>' variable.
-    if (isComputableAsJsExprsVisitor.exec(node)) {
+    if (isComputableAsPyExprsVisitor.exec(node)) {
       throw new AssertionError(
-          "Should only define 'htmlTag<n>' when not computable as JS expressions.");
+          "Should only define 'htmlTag<n>' when not computable as Python expressions.");
     }
 
-    jsCodeBuilder.pushOutputVar("htmlTag" + node.getId());
+    pyCodeBuilder.pushOutputVar("htmlTag" + node.getId());
     visitChildren(node);
-    jsCodeBuilder.popOutputVar();
+    pyCodeBuilder.popOutputVar();
   }
 
 
   @Override protected void visitInternal(PrintNode node) {
-    jsCodeBuilder.addToOutputVar(genJsExprsVisitor.exec(node));
+    pyCodeBuilder.addToOutputVar(genPyExprsVisitor.exec(node));
   }
 
 
@@ -638,52 +491,50 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    * </pre>
    * might generate
    * <pre>
-   *   if (opt_data.boo.foo &gt; 0) {
+   *   if opt_data.boo.foo &gt; 0:
    *     ...
-   *   }
    * </pre>
    */
   @Override protected void visitInternal(IfNode node) {
 
-    if (isComputableAsJsExprsVisitor.exec(node)) {
-      jsCodeBuilder.addToOutputVar(genJsExprsVisitor.exec(node));
+    if (isComputableAsPyExprsVisitor.exec(node)) {
+      pyCodeBuilder.addToOutputVar(genPyExprsVisitor.exec(node));
       return;
     }
 
-    // ------ Not computable as JS expressions, so generate full code. ------
+    // ------ Not computable as Python expressions, so generate full code. ------
 
     for (SoyNode child : node.getChildren()) {
 
       if (child instanceof IfCondNode) {
         IfCondNode icn = (IfCondNode) child;
 
-        JsExpr condJsExpr = jsExprTranslator.translateToJsExpr(
+        PyExpr condPyExpr = pyExprTranslator.translateToPyExpr(
             icn.getExpr(), icn.getExprText(), localVarTranslations);
+
         if (icn.getCommandName().equals("if")) {
-          jsCodeBuilder.appendLine("if (", condJsExpr.getText(), ") {");
+          pyCodeBuilder.appendLine("if ", condPyExpr.getText(), ":");
         } else {  // "elseif" block
-          jsCodeBuilder.appendLine("} else if (", condJsExpr.getText(), ") {");
+          pyCodeBuilder.appendLine("elsif ", condPyExpr.getText(), ":");
         }
 
-        jsCodeBuilder.increaseIndent();
+        pyCodeBuilder.increaseIndent();
         visit(icn);
-        jsCodeBuilder.decreaseIndent();
+        pyCodeBuilder.decreaseIndent();
 
       } else if (child instanceof IfElseNode) {
         IfElseNode ien = (IfElseNode) child;
 
-        jsCodeBuilder.appendLine("} else {");
+        pyCodeBuilder.appendLine("else:");
 
-        jsCodeBuilder.increaseIndent();
+        pyCodeBuilder.increaseIndent();
         visit(ien);
-        jsCodeBuilder.decreaseIndent();
+        pyCodeBuilder.decreaseIndent();
 
       } else {
         throw new AssertionError();
       }
     }
-
-    jsCodeBuilder.appendLine("}");
   }
 
 
@@ -701,58 +552,67 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    * </pre>
    * might generate
    * <pre>
-   *   switch (opt_data.boo) {
-   *     case 0:
+   *   switchVar1 = opt_data.boo
+   *   if switchVar1 == 0:
    *       ...
-   *       break;
-   *     case 1:
-   *     case 2:
+   *   elif switchVar1 == 1 or switchVar1 == 2:
    *       ...
-   *       break;
-   *     default:
+   *   else:
    *       ...
-   *   }
    * </pre>
    */
   @Override protected void visitInternal(SwitchNode node) {
 
-    JsExpr switchValueJsExpr = jsExprTranslator.translateToJsExpr(
+    PyExpr switchValuePyExpr = pyExprTranslator.translateToPyExpr(
         node.getExpr(), node.getExprText(), localVarTranslations);
-    jsCodeBuilder.appendLine("switch (", switchValueJsExpr.getText(), ") {");
-    jsCodeBuilder.increaseIndent();
+
+    String nodeId = node.getId();
+    String switchVarName = "switchVar" + nodeId;
+
+    pyCodeBuilder.appendLine(switchVarName, " = ", switchValuePyExpr.getText());
+
+    SwitchDefaultNode defaultNode = null;
+    SwitchCaseNode firstCaseNode = null;
 
     for (SoyNode child : node.getChildren()) {
 
       if (child instanceof SwitchCaseNode) {
         SwitchCaseNode scn = (SwitchCaseNode) child;
+        if (firstCaseNode == null)
+          firstCaseNode = scn;
 
+        String caseCond = (firstCaseNode == scn) ? "if " : "elif ";
         for (ExprNode caseExpr : scn.getExprList()) {
-          JsExpr caseJsExpr =
-              jsExprTranslator.translateToJsExpr(caseExpr, null, localVarTranslations);
-          jsCodeBuilder.appendLine("case ", caseJsExpr.getText(), ":");
+          PyExpr casePyExpr =
+              pyExprTranslator.translateToPyExpr(caseExpr, null, localVarTranslations);
+          if (caseExpr != scn.getExprList().get(0))
+            caseCond += " or ";
+          caseCond += switchVarName + " == " + casePyExpr.getText();
         }
+        pyCodeBuilder.appendLine(caseCond, ":");
 
-        jsCodeBuilder.increaseIndent();
+        pyCodeBuilder.increaseIndent();
         visit(scn);
-        jsCodeBuilder.appendLine("break;");
-        jsCodeBuilder.decreaseIndent();
+        pyCodeBuilder.decreaseIndent();
 
       } else if (child instanceof SwitchDefaultNode) {
-        SwitchDefaultNode sdn = (SwitchDefaultNode) child;
-
-        jsCodeBuilder.appendLine("default:");
-
-        jsCodeBuilder.increaseIndent();
-        visit(sdn);
-        jsCodeBuilder.decreaseIndent();
-
+        defaultNode = (SwitchDefaultNode) child;
       } else {
         throw new AssertionError();
       }
     }
 
-    jsCodeBuilder.decreaseIndent();
-    jsCodeBuilder.appendLine("}");
+    if (defaultNode != null) {
+      if (firstCaseNode != null) {
+        pyCodeBuilder.appendLine("else:");
+        pyCodeBuilder.increaseIndent();
+      }
+
+      visit(defaultNode);
+
+      if (firstCaseNode != null)
+        pyCodeBuilder.decreaseIndent();
+    }
   }
 
 
@@ -767,8 +627,8 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    * </pre>
    * might generate
    * <pre>
-   *   var fooList2 = opt_data.boo.foos;
-   *   var fooListLen2 = fooList2.length;
+   *   fooList2 = opt_data.boo.foos;
+   *   fooListLen2 = len(fooList2);
    *   if (fooListLen2 > 0) {
    *     ...
    *   } else {
@@ -785,16 +645,17 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
     String listLenVarName = baseVarName + "ListLen" + nodeId;
 
     // Define list var and list-len var.
-    JsExpr dataRefJsExpr = jsExprTranslator.translateToJsExpr(
+    PyExpr dataRefPyExpr = pyExprTranslator.translateToPyExpr(
         node.getDataRef(), node.getDataRefText(), localVarTranslations);
-    jsCodeBuilder.appendLine("var ", listVarName, " = ", dataRefJsExpr.getText(), ";");
-    jsCodeBuilder.appendLine("var ", listLenVarName, " = ", listVarName, ".length;");
+
+    pyCodeBuilder.appendLine(listVarName, " = ", dataRefPyExpr.getText());
+    pyCodeBuilder.appendLine(listLenVarName, " = len(", listVarName, ")");
 
     // If has 'ifempty' node, add the wrapper 'if' statement.
     boolean hasIfemptyNode = node.numChildren() == 2;
     if (hasIfemptyNode) {
-      jsCodeBuilder.appendLine("if (", listLenVarName, " > 0) {");
-      jsCodeBuilder.increaseIndent();
+      pyCodeBuilder.appendLine("if ", listLenVarName, " > 0:");
+      pyCodeBuilder.increaseIndent();
     }
 
     // Generate code for nonempty case.
@@ -802,15 +663,14 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
 
     // If has 'ifempty' node, add the 'else' block of the wrapper 'if' statement.
     if (hasIfemptyNode) {
-      jsCodeBuilder.decreaseIndent();
-      jsCodeBuilder.appendLine("} else {");
-      jsCodeBuilder.increaseIndent();
+      pyCodeBuilder.decreaseIndent();
+      pyCodeBuilder.appendLine("else:");
+      pyCodeBuilder.increaseIndent();
 
       // Generate code for empty case.
       visit((ForeachIfemptyNode) node.getChild(1));
 
-      jsCodeBuilder.decreaseIndent();
-      jsCodeBuilder.appendLine("}");
+      pyCodeBuilder.decreaseIndent();
     }
   }
 
@@ -840,25 +700,23 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
     String indexVarName = baseVarName + "Index" + foreachNodeId;
     String dataVarName = baseVarName + "Data" + foreachNodeId;
 
-    // The start of the JS 'for' loop.
-    jsCodeBuilder.appendLine("for (var ", indexVarName, " = 0; ",
-                             indexVarName, " < ", listLenVarName, "; ",
-                             indexVarName, "++) {");
-    jsCodeBuilder.increaseIndent();
-    jsCodeBuilder.appendLine("var ", dataVarName, " = ", listVarName, "[", indexVarName, "];");
+    // The start of the Python 'for' loop.
+    pyCodeBuilder.appendLine("for ", indexVarName, " in xrange(", listLenVarName, "):");
+    pyCodeBuilder.increaseIndent();
+    pyCodeBuilder.appendLine(dataVarName, " = ", listVarName, "[", indexVarName, "]");
 
     // Add a new localVarTranslations frame and populate it with the translations from this node.
-    Map<String, JsExpr> newLocalVarTranslationsFrame = Maps.newHashMap();
+    Map<String, PyExpr> newLocalVarTranslationsFrame = Maps.newHashMap();
     newLocalVarTranslationsFrame.put(
-        baseVarName, new JsExpr(dataVarName, Integer.MAX_VALUE));
+        baseVarName, new PyExpr(dataVarName, Integer.MAX_VALUE));
     newLocalVarTranslationsFrame.put(
-        baseVarName + "__isFirst", new JsExpr(indexVarName + " == 0",
+        baseVarName + "__isFirst", new PyExpr(indexVarName + " == 0",
                                                Operator.EQUAL.getPrecedence()));
     newLocalVarTranslationsFrame.put(
-        baseVarName + "__isLast", new JsExpr(indexVarName + " == " + listLenVarName + " - 1",
+        baseVarName + "__isLast", new PyExpr(indexVarName + " == " + listLenVarName + " - 1",
                                               Operator.EQUAL.getPrecedence()));
     newLocalVarTranslationsFrame.put(
-        baseVarName + "__index", new JsExpr(indexVarName, Integer.MAX_VALUE));
+        baseVarName + "__index", new PyExpr(indexVarName, Integer.MAX_VALUE));
     localVarTranslations.push(newLocalVarTranslationsFrame);
 
     // Generate the code for the loop body.
@@ -867,9 +725,8 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
     // Remove the localVarTranslations frame that we added above.
     localVarTranslations.pop();
 
-    // The end of the JS 'for' loop.
-    jsCodeBuilder.decreaseIndent();
-    jsCodeBuilder.appendLine("}");
+    // The end of the Python 'for' loop.
+    pyCodeBuilder.decreaseIndent();
   }
 
 
@@ -882,10 +739,8 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    * </pre>
    * might generate
    * <pre>
-   *   var iLimit4 = opt_data.boo;
-   *   for (var i4 = 1; i4 &lt; iLimit4; i4++) {
+   *   for i4 in xrange(1, opt_dta.boo, 1):
    *     ...
-   *   }
    * </pre>
    */
   @Override protected void visitInternal(ForNode node) {
@@ -893,60 +748,28 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
     String varName = node.getLocalVarName();
     String nodeId = node.getId();
 
-    // Get the JS expression text for the init/limit/increment values.
+    // Get the Python expression text for the init/limit/increment values.
     List<ExprRootNode<ExprNode>> rangeArgs = Lists.newArrayList(node.getRangeArgs());
-    String incrementJsExprText =
+    String incrementPyExprText =
         (rangeArgs.size() == 3) ?
-        jsExprTranslator.translateToJsExpr(rangeArgs.remove(2), null, localVarTranslations)
+        pyExprTranslator.translateToPyExpr(rangeArgs.remove(2), null, localVarTranslations)
             .getText() :
         "1" /* default */;
-    String initJsExprText =
+    String initPyExprText =
         (rangeArgs.size() == 2) ?
-        jsExprTranslator.translateToJsExpr(rangeArgs.remove(0), null, localVarTranslations)
+        pyExprTranslator.translateToPyExpr(rangeArgs.remove(0), null, localVarTranslations)
             .getText() :
         "0" /* default */;
-    String limitJsExprText =
-        jsExprTranslator.translateToJsExpr(rangeArgs.get(0), null, localVarTranslations).getText();
+    String limitPyExprText =
+        pyExprTranslator.translateToPyExpr(rangeArgs.get(0), null, localVarTranslations).getText();
 
-    // If any of the JS expressions for init/limit/increment isn't an integer, precompute its value.
-    String initCode;
-    if (INTEGER.matcher(initJsExprText).matches()) {
-      initCode = initJsExprText;
-    } else {
-      initCode = varName + "Init" + nodeId;
-      jsCodeBuilder.appendLine("var ", initCode, " = ", initJsExprText, ";");
-    }
-
-    String limitCode;
-    if (INTEGER.matcher(limitJsExprText).matches()) {
-      limitCode = limitJsExprText;
-    } else {
-      limitCode = varName + "Limit" + nodeId;
-      jsCodeBuilder.appendLine("var ", limitCode, " = ", limitJsExprText, ";");
-    }
-
-    String incrementCode;
-    if (INTEGER.matcher(incrementJsExprText).matches()) {
-      incrementCode = incrementJsExprText;
-    } else {
-      incrementCode = varName + "Increment" + nodeId;
-      jsCodeBuilder.appendLine("var ", incrementCode, " = ", incrementJsExprText, ";");
-    }
-
-    // The start of the JS 'for' loop.
-    String incrementStmt =
-        (incrementCode.equals("1")) ? varName + nodeId + "++"
-                                    : varName + nodeId + " += " + incrementCode;
-    jsCodeBuilder.appendLine("for (var ",
-                             varName, nodeId, " = ", initCode, "; ",
-                             varName, nodeId, " < ", limitCode, "; ",
-                             incrementStmt,
-                             ") {");
-    jsCodeBuilder.increaseIndent();
+    pyCodeBuilder.appendLine("for ", varName, nodeId, " in xrange(", initPyExprText, ", ",
+                             limitPyExprText, ", ", incrementPyExprText, "):");
+    pyCodeBuilder.increaseIndent();
 
     // Add a new localVarTranslations frame and populate it with the translations from this node.
-    Map<String, JsExpr> newLocalVarTranslationsFrame = Maps.newHashMap();
-    newLocalVarTranslationsFrame.put(varName, new JsExpr(varName + nodeId, Integer.MAX_VALUE));
+    Map<String, PyExpr> newLocalVarTranslationsFrame = Maps.newHashMap();
+    newLocalVarTranslationsFrame.put(varName, new PyExpr(varName + nodeId, Integer.MAX_VALUE));
     localVarTranslations.push(newLocalVarTranslationsFrame);
 
     // Generate the code for the loop body.
@@ -955,9 +778,8 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
     // Remove the localVarTranslations frame that we added above.
     localVarTranslations.pop();
 
-    // The end of the JS 'for' loop.
-    jsCodeBuilder.decreaseIndent();
-    jsCodeBuilder.appendLine("}");
+    // The end of the Python 'for' loop.
+    pyCodeBuilder.decreaseIndent();
   }
 
 
@@ -980,50 +802,50 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
    *   output += some.func(opt_data);
    *   output += some.func(opt_data.boo.foo);
    *   output += some.func({goo: 88});
-   *   output += some.func(soy.$$augmentData(opt_data.boo, {goo: 'Hello ' + opt_data.name});
+   *   output += some.func(pysoy.augment_data(opt_data.boo, {goo: 'Hello ' + opt_data.name});
    * </pre>
    */
   @Override protected void visitInternal(CallNode node) {
 
-    // If this node has any CallParamContentNode children those contents are not computable as JS
+    // If this node has any CallParamContentNode children those contents are not computable as Python
     // expressions, visit them to generate code to define their respective 'param<n>' variables.
     for (CallParamNode child : node.getChildren()) {
-      if (child instanceof CallParamContentNode && !isComputableAsJsExprsVisitor.exec(child)) {
+      if (child instanceof CallParamContentNode && !isComputableAsPyExprsVisitor.exec(child)) {
         visit(child);
       }
     }
 
-    if (jsSrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER) {
+    if (pySrcOptions.getCodeStyle() == CodeStyle.STRINGBUILDER) {
       // For 'stringbuilder' code style, pass the current output var to collect the call's output.
-      JsExpr objToPass = genCallCodeUtils.genObjToPass(
+      PyExpr objToPass = genCallCodeUtils.genObjToPass(
           node,
           localVarTranslations);
-      jsCodeBuilder.indent().append(node.getCalleeName(), "(", objToPass.getText(), ", ")
-          .appendOutputVarName().append(");\n");
+      pyCodeBuilder.indent().append(node.getCalleeName(), "(", objToPass.getText(), ", ")
+          .appendOutputVarName().append(")\n");
 
     } else {
       // For 'concat' code style, we simply add the call's result to the current output var.
-      JsExpr callExpr = genCallCodeUtils.genCallExpr(node, localVarTranslations);
-      jsCodeBuilder.addToOutputVar(ImmutableList.of(callExpr));
+      PyExpr callExpr = genCallCodeUtils.genCallExpr(node, localVarTranslations);
+      pyCodeBuilder.addToOutputVar(ImmutableList.of(callExpr));
     }
   }
 
 
   @Override protected void visitInternal(CallParamContentNode node) {
 
-    // This node should only be visited when it's not computable as JS expressions, because this
+    // This node should only be visited when it's not computable as Python expressions, because this
     // method just generates the code to define the temporary 'param<n>' variable.
-    if (isComputableAsJsExprsVisitor.exec(node)) {
+    if (isComputableAsPyExprsVisitor.exec(node)) {
       throw new AssertionError(
-          "Should only define 'param<n>' when not computable as JS expressions.");
+          "Should only define 'param<n>' when not computable as Python expressions.");
     }
 
-    localVarTranslations.push(Maps.<String, JsExpr>newHashMap());
-    jsCodeBuilder.pushOutputVar("param" + node.getId());
+    localVarTranslations.push(Maps.<String, PyExpr>newHashMap());
+    pyCodeBuilder.pushOutputVar("param" + node.getId());
 
     visitChildren(node);
 
-    jsCodeBuilder.popOutputVar();
+    pyCodeBuilder.popOutputVar();
     localVarTranslations.pop();
   }
 
@@ -1034,9 +856,9 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
 
   @Override protected void visitInternal(SoyNode node) {
 
-    if (isComputableAsJsExprsVisitor.exec(node)) {
-      // Simply generate JS expressions for this node and add them to the current output var.
-      jsCodeBuilder.addToOutputVar(genJsExprsVisitor.exec(node));
+    if (isComputableAsPyExprsVisitor.exec(node)) {
+      // Simply generate Python expressions for this node and add them to the current output var.
+      pyCodeBuilder.addToOutputVar(genPyExprsVisitor.exec(node));
 
     } else {
       // Need to implement visitInternal() for the specific case.
@@ -1046,7 +868,7 @@ class GenJsCodeVisitor extends AbstractSoyNodeVisitor<List<String>> {
 
 
   @Override protected void visitInternal(ParentSoyNode<? extends SoyNode> node) {
-    localVarTranslations.push(Maps.<String, JsExpr>newHashMap());
+    localVarTranslations.push(Maps.<String, PyExpr>newHashMap());
     visitChildren(node);
     localVarTranslations.pop();
   }

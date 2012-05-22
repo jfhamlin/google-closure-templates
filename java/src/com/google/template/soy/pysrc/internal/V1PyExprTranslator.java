@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
 import com.google.template.soy.base.SoySyntaxException;
 import com.google.template.soy.exprtree.Operator;
-import com.google.template.soy.jssrc.restricted.JsExpr;
+import com.google.template.soy.pysrc.restricted.PyExpr;
 
 import java.util.Deque;
 import java.util.Map;
@@ -29,14 +29,14 @@ import java.util.regex.Pattern;
 
 
 /**
- * Translator of Soy V1 expressions to their equivalent JS expressions. Needed in order to provide
+ * Translator of Soy V1 expressions to their equivalent Python expressions. Needed in order to provide
  * the semi backwards compatibility with Soy V1.
  *
  * <p> Adapted from Soy V1 code.
  *
  * @author Kai Huang
  */
-class V1JsExprTranslator {
+class V1PyExprTranslator {
 
 
   /** Regex for a template variable or data reference. */
@@ -71,7 +71,7 @@ class V1JsExprTranslator {
 
 
   /**
-   * Helper function to generate code for a JS expression found in a Soy tag.
+   * Helper function to generate code for a Python expression found in a Soy tag.
    * Replaces all variables, data references, and special function calls in
    * the given expression text with the appropriate generated code. E.g.
    * <pre>
@@ -87,41 +87,41 @@ class V1JsExprTranslator {
    * @return The resulting expression code after the necessary substitutions.
    * @throws SoySyntaxException If the given expression has an error.
    */
-  public static JsExpr translateToJsExpr(String soyExpr,
-                                         Deque<Map<String, JsExpr>> localVarTranslations)
+  public static PyExpr translateToPyExpr(String soyExpr,
+                                         Deque<Map<String, PyExpr>> localVarTranslations)
       throws SoySyntaxException {
 
     soyExpr = CharMatcher.WHITESPACE.collapseFrom(soyExpr, ' ');
 
-    StringBuffer jsExprTextSb = new StringBuffer();
+    StringBuffer pyExprTextSb = new StringBuffer();
 
     Matcher matcher = VAR_OR_REF_OR_BOOL_OP_OR_SOY_FUNCTION.matcher(soyExpr);
     while (matcher.find()) {
       String group = matcher.group();
       if (VAR_OR_REF.matcher(group).matches()) {
         matcher.appendReplacement(
-            jsExprTextSb,
+            pyExprTextSb,
             Matcher.quoteReplacement(translateVarOrRef(group, localVarTranslations)));
       } else if (BOOL_OP_RE.matcher(group).matches()) {
         matcher.appendReplacement(
-            jsExprTextSb,
+            pyExprTextSb,
             Matcher.quoteReplacement(translateBoolOp(group)));
       } else {
         matcher.appendReplacement(
-            jsExprTextSb,
+            pyExprTextSb,
             Matcher.quoteReplacement(translateFunction(group, localVarTranslations)));
       }
     }
-    matcher.appendTail(jsExprTextSb);
+    matcher.appendTail(pyExprTextSb);
 
-    String jsExprText = jsExprTextSb.toString();
+    String pyExprText = pyExprTextSb.toString();
 
     // Note: There is a JavaScript language quirk that requires all Unicode Foramt characters
-    // (Unicode category "Cf") to be escaped in JS strings. Therefore, we call
-    // JsSrcUtils.escapeUnicodeFormatChars() on the expression text in case it contains JS strings.
-    jsExprText = JsSrcUtils.escapeUnicodeFormatChars(jsExprText);
-    int jsExprPrec = guessJsExprPrecedence(jsExprText);
-    return new JsExpr(jsExprText, jsExprPrec);
+    // (Unicode category "Cf") to be escaped in Python strings. Therefore, we call
+    // PySrcUtils.escapeUnicodeFormatChars() on the expression text in case it contains Python strings.
+    pyExprText = PySrcUtils.escapeUnicodeFormatChars(pyExprText);
+    int pyExprPrec = guessPyExprPrecedence(pyExprText);
+    return new PyExpr(pyExprText, pyExprPrec);
   }
 
 
@@ -138,13 +138,13 @@ class V1JsExprTranslator {
    * </pre>
    *
    * @param varOrRefText The variable or data reference to translage.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
    * @return Generated translation for the variable or data reference.
    * @throws SoySyntaxException If the {@code varOrRefText} is malformed.
    */
   private static String translateVarOrRef(String varOrRefText,
-                                          Deque<Map<String, JsExpr>> localVarTranslations)
+                                          Deque<Map<String, PyExpr>> localVarTranslations)
       throws SoySyntaxException {
 
     Matcher matcher = VAR_OR_REF.matcher(varOrRefText);
@@ -184,18 +184,18 @@ class V1JsExprTranslator {
 
 
   /**
-   * Helper function to translate a boolean operator from Soy to JS.
+   * Helper function to translate a boolean operator from Soy to Python.
    * @param boolOp The Soy boolean operator.
    * @return The translated string.
    */
   private static String translateBoolOp(String boolOp) {
 
     if (boolOp.equals("not")) {
-      return "!";
+      return "not";
     } else if (boolOp.equals("and")) {
-      return "&&";
+      return "and";
     } else if (boolOp.equals("or")) {
-      return "||";
+      return "or";
     } else {
       throw new AssertionError();
     }
@@ -207,13 +207,13 @@ class V1JsExprTranslator {
    * special function call.
    *
    * @param functionText The text of the special function call.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
    * @return The translated string
    * @throws SoySyntaxException If a syntax error is detected.
    */
   private static String translateFunction(String functionText,
-                                          Deque<Map<String, JsExpr>> localVarTranslations)
+                                          Deque<Map<String, PyExpr>> localVarTranslations)
       throws SoySyntaxException {
 
     Matcher matcher = SOY_FUNCTION.matcher(functionText);
@@ -229,14 +229,14 @@ class V1JsExprTranslator {
 
   // We guess the precedence of the expression by searching for characters that appear in
   // operator tokens. This is of course far from accurate, but it's a reasonable effort.
-  private static int guessJsExprPrecedence(String jsExprText) {
+  private static int guessPyExprPrecedence(String pyExprText) {
 
     // We guess the precedence of the expression by searching for characters that appear in
     // operator tokens. This is of course far from accurate, but it's a reasonable effort.
 
     int prec = Integer.MAX_VALUE;  // to be adjusted below
 
-    Matcher matcher = OP_TOKEN_CHAR.matcher(jsExprText);
+    Matcher matcher = OP_TOKEN_CHAR.matcher(pyExprText);
     while (matcher.find()) {
       switch(matcher.group().charAt(0)) {
         case '?':
@@ -254,7 +254,7 @@ class V1JsExprTranslator {
           prec = Math.min(prec, Operator.EQUAL.getPrecedence());
           break;
         case '!':
-          if (jsExprText.contains("!=")) {
+          if (pyExprText.contains("!=")) {
             prec = Math.min(prec, Operator.NOT_EQUAL.getPrecedence());
           } else {  // must be "!"
             prec = Math.min(prec, Operator.NOT.getPrecedence());
@@ -295,15 +295,15 @@ class V1JsExprTranslator {
    * Gets the translated expression for an in-scope local variable (or special "variable" derived
    * from a foreach-loop var), or null if not found.
    * @param ident The Soy local variable to translate.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
    * @return The translated string for the given variable, or null if not found.
    */
   private static String getLocalVarTranslation(String ident,
-                                               Deque<Map<String, JsExpr>> localVarTranslations) {
+                                               Deque<Map<String, PyExpr>> localVarTranslations) {
 
-    for (Map<String, JsExpr> localVarTranslationsFrame : localVarTranslations) {
-      JsExpr translation = localVarTranslationsFrame.get(ident);
+    for (Map<String, PyExpr> localVarTranslationsFrame : localVarTranslations) {
+      PyExpr translation = localVarTranslationsFrame.get(ident);
       if (translation != null) {
         if (translation.getPrecedence() != Integer.MAX_VALUE) {
           return "(" + translation.getText() + ")";

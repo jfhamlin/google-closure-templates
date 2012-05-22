@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.restricted;
+package com.google.template.soy.pysrc.restricted;
 
 import com.google.template.soy.exprtree.Operator;
 
@@ -22,46 +22,46 @@ import java.util.List;
 
 
 /**
- * Common utilities for dealing with JS expressions.
+ * Common utilities for dealing with Python expressions.
  *
  * <p> Important: This class may only be used in implementing plugins (e.g. functions, directives).
  *
  * @author Kai Huang
  */
-public class JsExprUtils {
+public class PyExprUtils {
 
-  private JsExprUtils() {}
+  private PyExprUtils() {}
 
 
   /**
-   * Builds one JS expression that computes the concatenation of the given JS expressions. The '+'
+   * Builds one Python expression that computes the concatenation of the given Python expressions. The '+'
    * operator is used for concatenation. Operands will be protected with an extra pair of
    * parentheses if and only if needed.
    *
-   * @param jsExprs The JS expressions to concatentate.
-   * @return One JS expression that computes the concatenation of the given JS expressions.
+   * @param pyExprs The Python expressions to concatentate.
+   * @return One Python expression that computes the concatenation of the given Python expressions.
    */
-  public static JsExpr concatJsExprs(List<JsExpr> jsExprs) {
+  public static PyExpr concatPyExprs(List<PyExpr> pyExprs) {
 
-    if (jsExprs.size() == 0) {
-      return new JsExpr("''", Integer.MAX_VALUE);
+    if (pyExprs.size() == 0) {
+      return new PyExpr("''", Integer.MAX_VALUE);
     }
 
-    if (jsExprs.size() == 1) {
-      return jsExprs.get(0);
+    if (pyExprs.size() == 1) {
+      return pyExprs.get(0);
     }
 
     int plusOpPrec = Operator.PLUS.getPrecedence();
     StringBuilder resultSb = new StringBuilder();
 
     boolean isFirst = true;
-    for (JsExpr jsExpr : jsExprs) {
+    for (PyExpr pyExpr : pyExprs) {
 
       // The first operand needs protection only if it's strictly lower precedence. The non-first
       // operands need protection when they're lower or equal precedence. (This is true for all
       // left-associative operators.)
-      boolean needsProtection = isFirst ? jsExpr.getPrecedence() < plusOpPrec
-                                        : jsExpr.getPrecedence() <= plusOpPrec;
+      boolean needsProtection = isFirst ? pyExpr.getPrecedence() < plusOpPrec
+                                        : pyExpr.getPrecedence() <= plusOpPrec;
 
       if (isFirst) {
         isFirst = false;
@@ -70,13 +70,13 @@ public class JsExprUtils {
       }
 
       if (needsProtection) {
-        resultSb.append("(").append(jsExpr.getText()).append(")");
+        resultSb.append("(").append(pyExpr.getText()).append(")");
       } else {
-        resultSb.append(jsExpr.getText());
+        resultSb.append(pyExpr.getText());
       }
     }
 
-    return new JsExpr(resultSb.toString(), plusOpPrec);
+    return new PyExpr(resultSb.toString(), plusOpPrec);
   }
 
 }

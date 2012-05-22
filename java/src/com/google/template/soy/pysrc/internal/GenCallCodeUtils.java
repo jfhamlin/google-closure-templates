@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.inject.Inject;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
-import com.google.template.soy.jssrc.internal.GenJsExprsVisitor.GenJsExprsVisitorFactory;
-import com.google.template.soy.jssrc.restricted.JsExpr;
-import com.google.template.soy.jssrc.restricted.JsExprUtils;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.internal.GenPyExprsVisitor.GenPyExprsVisitorFactory;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.PyExprUtils;
 import com.google.template.soy.soytree.CallNode;
 import com.google.template.soy.soytree.CallParamContentNode;
 import com.google.template.soy.soytree.CallParamNode;
@@ -32,48 +32,48 @@ import java.util.Map;
 
 
 /**
- * Utilities for generating JS code for calls.
+ * Utilities for generating Python code for calls.
  *
  * @author Kai Huang
  */
 class GenCallCodeUtils {
 
 
-  /** The options for generating JS source code. */
-  private final SoyJsSrcOptions jsSrcOptions;
+  /** The options for generating Python source code. */
+  private final SoyPySrcOptions pySrcOptions;
 
-  /** Instance of JsExprTranslator to use. */
-  private final JsExprTranslator jsExprTranslator;
+  /** Instance of PyExprTranslator to use. */
+  private final PyExprTranslator pyExprTranslator;
 
-  /** The IsComputableAsJsExprsVisitor used by this instance. */
-  private final IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor;
+  /** The IsComputableAsPyExprsVisitor used by this instance. */
+  private final IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor;
 
-  /** Factory for creating an instance of GenJsExprsVisitor. */
-  private final GenJsExprsVisitorFactory genJsExprsVisitorFactory;
+  /** Factory for creating an instance of GenPyExprsVisitor. */
+  private final GenPyExprsVisitorFactory genPyExprsVisitorFactory;
 
 
   /**
-   * @param jsSrcOptions The options for generating JS source code.
-   * @param jsExprTranslator Instance of JsExprTranslator to use.
-   * @param isComputableAsJsExprsVisitor The IsComputableAsJsExprsVisitor to be used.
-   * @param genJsExprsVisitorFactory Factory for creating an instance of GenJsExprsVisitor.
+   * @param pySrcOptions The options for generating Python source code.
+   * @param pyExprTranslator Instance of PyExprTranslator to use.
+   * @param isComputableAsPyExprsVisitor The IsComputableAsPyExprsVisitor to be used.
+   * @param genPyExprsVisitorFactory Factory for creating an instance of GenPyExprsVisitor.
    */
   @Inject
-  GenCallCodeUtils(SoyJsSrcOptions jsSrcOptions, JsExprTranslator jsExprTranslator,
-                   IsComputableAsJsExprsVisitor isComputableAsJsExprsVisitor,
-                   GenJsExprsVisitorFactory genJsExprsVisitorFactory) {
-    this.jsSrcOptions = jsSrcOptions;
-    this.jsExprTranslator = jsExprTranslator;
-    this.isComputableAsJsExprsVisitor = isComputableAsJsExprsVisitor;
-    this.genJsExprsVisitorFactory = genJsExprsVisitorFactory;
+  GenCallCodeUtils(SoyPySrcOptions pySrcOptions, PyExprTranslator pyExprTranslator,
+                   IsComputableAsPyExprsVisitor isComputableAsPyExprsVisitor,
+                   GenPyExprsVisitorFactory genPyExprsVisitorFactory) {
+    this.pySrcOptions = pySrcOptions;
+    this.pyExprTranslator = pyExprTranslator;
+    this.isComputableAsPyExprsVisitor = isComputableAsPyExprsVisitor;
+    this.genPyExprsVisitorFactory = genPyExprsVisitorFactory;
   }
 
 
   /**
-   * Generates the JS expression for a given call (the version that doesn't pass a StringBuilder).
+   * Generates the Python expression for a given call (the version that doesn't pass a StringBuilder).
    *
    * <p> Important: If there are CallParamContentNode children whose contents are not computable as
-   * JS expressions, then this function assumes that, elsewhere, code has been generated to define
+   * Python expressions, then this function assumes that, elsewhere, code has been generated to define
    * their respective 'param<n>' temporary variables.
    *
    * <p> Here are five example calls:
@@ -97,30 +97,30 @@ class GenCallCodeUtils {
    *   some.func(opt_data)
    *   some.func(opt_data.boo.foo)
    *   some.func({goo: opt_data.moo})
-   *   some.func(soy.$$augmentData(opt_data.boo, {goo: 'Blah'}))
+   *   some.func(pysoy.augment_data(opt_data.boo, {goo: 'Blah'}))
    *   some.func({goo: param65})
    * </pre>
-   * Note that in the last case, the param content is not computable as JS expressions, so we assume
+   * Note that in the last case, the param content is not computable as Python expressions, so we assume
    * that code has been generated to define the temporary variable 'param<n>'.
    *
    * @param callNode The call to generate code for.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
-   * @return The JS expression for the call (the version that doesn't pass a StringBuilder).
+   * @return The Python expression for the call (the version that doesn't pass a StringBuilder).
    */
-  public JsExpr genCallExpr(CallNode callNode, Deque<Map<String, JsExpr>> localVarTranslations) {
+  public PyExpr genCallExpr(CallNode callNode, Deque<Map<String, PyExpr>> localVarTranslations) {
 
-    JsExpr objToPass = genObjToPass(callNode, localVarTranslations);
-    return new JsExpr(
+    PyExpr objToPass = genObjToPass(callNode, localVarTranslations);
+    return new PyExpr(
         callNode.getCalleeName() + "(" + objToPass.getText() + ")", Integer.MAX_VALUE);
   }
 
 
   /**
-   * Generates the JS expression for the object to pass in a given call.
+   * Generates the Python expression for the object to pass in a given call.
    *
    * <p> Important: If there are CallParamContentNode children whose contents are not computable as
-   * JS expressions, then this function assumes that, elsewhere, code has been generated to define
+   * Python expressions, then this function assumes that, elsewhere, code has been generated to define
    * their respective 'param<n>' temporary variables.
    *
    * <p> Here are five example calls:
@@ -143,29 +143,29 @@ class GenCallCodeUtils {
    * <pre>
    *   opt_data
    *   opt_data.boo.foo
-   *   {goo: opt_data.moo}
-   *   soy.$$augmentData(opt_data.boo, {goo: 'Blah'})
-   *   {goo: param65}
+   *   {'goo': opt_data.moo}
+   *   pysoy.augment_data(opt_data.boo, {'goo': 'Blah'})
+   *   {'goo': param65}
    * </pre>
-   * Note that in the last case, the param content is not computable as JS expressions, so we assume
+   * Note that in the last case, the param content is not computable as Python expressions, so we assume
    * that code has been generated to define the temporary variable 'param<n>'.
    *
    * @param callNode The call to generate code for.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
-   * @return The JS expression for the object to pass in the call.
+   * @return The Python expression for the object to pass in the call.
    */
-  public JsExpr genObjToPass(CallNode callNode, Deque<Map<String, JsExpr>> localVarTranslations) {
+  public PyExpr genObjToPass(CallNode callNode, Deque<Map<String, PyExpr>> localVarTranslations) {
 
     // ------ Generate the expression for the original data to pass ------
-    JsExpr dataToPass;
+    PyExpr dataToPass;
     if (callNode.isPassingAllData()) {
-      dataToPass = new JsExpr("opt_data", Integer.MAX_VALUE);
+      dataToPass = new PyExpr("opt_data", Integer.MAX_VALUE);
     } else if (callNode.isPassingData()) {
-      dataToPass = jsExprTranslator.translateToJsExpr(
+      dataToPass = pyExprTranslator.translateToPyExpr(
           callNode.getDataRef(), callNode.getDataRefText(), localVarTranslations);
     } else {
-      dataToPass = new JsExpr("null", Integer.MAX_VALUE);
+      dataToPass = new PyExpr("None", Integer.MAX_VALUE);
     }
 
     // ------ Case 1: No additional params ------
@@ -186,29 +186,29 @@ class GenCallCodeUtils {
         paramsObjSb.append(", ");
       }
 
-      String key = child.getKey();
+      String key = "'" + child.getKey() + "'";
       paramsObjSb.append(key).append(": ");
 
       if (child instanceof CallParamValueNode) {
         CallParamValueNode cpvn = (CallParamValueNode) child;
-        JsExpr valueJsExpr = jsExprTranslator.translateToJsExpr(
+        PyExpr valuePyExpr = pyExprTranslator.translateToPyExpr(
             cpvn.getValueExpr(), cpvn.getValueExprText(), localVarTranslations);
-        paramsObjSb.append(valueJsExpr.getText());
+        paramsObjSb.append(valuePyExpr.getText());
 
       } else {
         CallParamContentNode cpcn = (CallParamContentNode) child;
 
-        if (isComputableAsJsExprsVisitor.exec(cpcn)) {
-          List<JsExpr> cpcnJsExprs =
-              genJsExprsVisitorFactory.create(localVarTranslations).exec(cpcn);
-          JsExpr valueJsExpr = JsExprUtils.concatJsExprs(cpcnJsExprs);
-          paramsObjSb.append(valueJsExpr.getText());
+        if (isComputableAsPyExprsVisitor.exec(cpcn)) {
+          List<PyExpr> cpcnPyExprs =
+              genPyExprsVisitorFactory.create(localVarTranslations).exec(cpcn);
+          PyExpr valuePyExpr = PyExprUtils.concatPyExprs(cpcnPyExprs);
+          paramsObjSb.append(valuePyExpr.getText());
 
         } else {
-          // This is a param with content that cannot be represented as JS expressions, so we assume
+          // This is a param with content that cannot be represented as Python expressions, so we assume
           // that code has been generated to define the temporary variable 'param<n>'.
-          if (jsSrcOptions.getCodeStyle() == SoyJsSrcOptions.CodeStyle.STRINGBUILDER) {
-            paramsObjSb.append("param").append(cpcn.getId()).append(".toString()");
+          if (pySrcOptions.getCodeStyle() == SoyPySrcOptions.CodeStyle.STRINGBUILDER) {
+            paramsObjSb.append("str(").append("param").append(cpcn.getId()).append(")");
           } else {
             paramsObjSb.append("param").append(cpcn.getId());
           }
@@ -220,11 +220,11 @@ class GenCallCodeUtils {
 
     // ------ Cases 2 and 3: Additional params with and without original data to pass ------
     if (callNode.isPassingData()) {
-      return new JsExpr(
-          "soy.$$augmentData(" + dataToPass.getText() + ", " + paramsObjSb.toString() + ")",
+      return new PyExpr(
+          "pysoy.augment_data(" + dataToPass.getText() + ", " + paramsObjSb.toString() + ")",
           Integer.MAX_VALUE);
     } else {
-      return new JsExpr(paramsObjSb.toString(), Integer.MAX_VALUE);
+      return new PyExpr(paramsObjSb.toString(), Integer.MAX_VALUE);
     }
   }
 

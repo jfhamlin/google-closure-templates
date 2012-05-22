@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.inject.Inject;
 import com.google.template.soy.exprtree.AbstractExprNodeVisitor;
 import com.google.template.soy.exprtree.ExprNode;
 import com.google.template.soy.exprtree.ExprNode.ParentExprNode;
 import com.google.template.soy.exprtree.FunctionNode;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
-import com.google.template.soy.jssrc.internal.TranslateToJsExprVisitor.TranslateToJsExprVisitorFactory;
-import com.google.template.soy.jssrc.restricted.JsExpr;
-import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.internal.TranslateToPyExprVisitor.TranslateToPyExprVisitorFactory;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.shared.internal.ImpureFunction;
 
 import java.util.Deque;
@@ -32,79 +32,79 @@ import java.util.Map;
 
 
 /**
- * Translator of Soy expressions to their equivalent JS expressions.
+ * Translator of Soy expressions to their equivalent Python expressions.
  *
  * @author Kai Huang
  */
-class JsExprTranslator {
+class PyExprTranslator {
 
 
-  /** Map of all SoyJsSrcFunctions (name to function). */
-  private final Map<String, SoyJsSrcFunction> soyJsSrcFunctionsMap;
+  /** Map of all SoyPySrcFunctions (name to function). */
+  private final Map<String, SoyPySrcFunction> soyPySrcFunctionsMap;
 
-  /** The options for generating JS source code. */
-  private final SoyJsSrcOptions jsSrcOptions;
+  /** The options for generating Python source code. */
+  private final SoyPySrcOptions pySrcOptions;
 
-  /** Factory for creating an instance of TranslateToJsExprVisitor. */
-  private final TranslateToJsExprVisitorFactory translateToJsExprVisitorFactory;
+  /** Factory for creating an instance of TranslateToPyExprVisitor. */
+  private final TranslateToPyExprVisitorFactory translateToPyExprVisitorFactory;
 
 
   /**
-   * @param soyJsSrcFunctionsMap Map of all SoyJsSrcFunctions (name to function).
-   * @param jsSrcOptions The options for generating JS source code.
-   * @param translateToJsExprVisitorFactory Factory for creating an instance of
-   *     TranslateToJsExprVisitor.
+   * @param soyPySrcFunctionsMap Map of all SoyPySrcFunctions (name to function).
+   * @param pySrcOptions The options for generating Python source code.
+   * @param translateToPyExprVisitorFactory Factory for creating an instance of
+   *     TranslateToPyExprVisitor.
    */
-  @Inject JsExprTranslator(
-      Map<String, SoyJsSrcFunction> soyJsSrcFunctionsMap, SoyJsSrcOptions jsSrcOptions,
-      TranslateToJsExprVisitorFactory translateToJsExprVisitorFactory) {
-    this.soyJsSrcFunctionsMap = soyJsSrcFunctionsMap;
-    this.jsSrcOptions = jsSrcOptions;
-    this.translateToJsExprVisitorFactory = translateToJsExprVisitorFactory;
+  @Inject PyExprTranslator(
+      Map<String, SoyPySrcFunction> soyPySrcFunctionsMap, SoyPySrcOptions pySrcOptions,
+      TranslateToPyExprVisitorFactory translateToPyExprVisitorFactory) {
+    this.soyPySrcFunctionsMap = soyPySrcFunctionsMap;
+    this.pySrcOptions = pySrcOptions;
+    this.translateToPyExprVisitorFactory = translateToPyExprVisitorFactory;
   }
 
 
   /**
-   * Translates a Soy expression to the equivalent JS expression. Detects whether an expression
+   * Translates a Soy expression to the equivalent Python expression. Detects whether an expression
    * is Soy V2 or V1 syntax and performs the translation accordingly. Takes both an ExprNode and
    * the expression text as a string because Soy V1 code will not necessarily be parsable as an
    * ExprNode.
    *
    * @param expr The Soy expression to translate.
    * @param exprText The expression text.
-   * @param localVarTranslations The current stack of replacement JS expressions for the local
+   * @param localVarTranslations The current stack of replacement Python expressions for the local
    *     variables (and foreach-loop special functions) current in scope.
-   * @return The built JS expression.
+   * @return The built Python expression.
    */
-  public JsExpr translateToJsExpr(
-      ExprNode expr, String exprText, Deque<Map<String, JsExpr>> localVarTranslations) {
+  public PyExpr translateToPyExpr(
+      ExprNode expr, String exprText, Deque<Map<String, PyExpr>> localVarTranslations) {
 
     if (expr != null &&
-        (! jsSrcOptions.shouldAllowDeprecatedSyntax() ||
-         (new CheckAllFunctionsSupportedVisitor(soyJsSrcFunctionsMap)).exec(expr))) {
+        (! pySrcOptions.shouldAllowDeprecatedSyntax() ||
+         (new CheckAllFunctionsSupportedVisitor(soyPySrcFunctionsMap)).exec(expr))) {
       // V2 expression.
-      return translateToJsExprVisitorFactory.create(localVarTranslations).exec(expr);
+      return translateToPyExprVisitorFactory.create(localVarTranslations).exec(expr);
     } else {
       // V1 expression.
-      return V1JsExprTranslator.translateToJsExpr(exprText, localVarTranslations);
+      return V1PyExprTranslator.translateToPyExpr(exprText, localVarTranslations);
     }
   }
 
 
   /**
    * Private helper class to check whether all functions in an expression are supported
-   * (implemented by an available SoyJsSrcFunction).
+   * (implemented by an available SoyPySrcFunction).
    */
   private static class CheckAllFunctionsSupportedVisitor extends AbstractExprNodeVisitor<Boolean> {
 
-    /** Map of all SoyJsSrcFunctions (name to function). */
-    private final Map<String, SoyJsSrcFunction> soyJsSrcFunctionsMap;
+    /** Map of all SoyPySrcFunctions (name to function). */
+    private final Map<String, SoyPySrcFunction> soyPySrcFunctionsMap;
 
     /** Whether all functions in the expression are supported. */
     private boolean areAllFunctionsSupported;
 
-    public CheckAllFunctionsSupportedVisitor(Map<String, SoyJsSrcFunction> soyJsSrcFunctionsMap) {
-      this.soyJsSrcFunctionsMap = soyJsSrcFunctionsMap;
+    public CheckAllFunctionsSupportedVisitor(Map<String, SoyPySrcFunction> soyPySrcFunctionsMap) {
+      this.soyPySrcFunctionsMap = soyPySrcFunctionsMap;
     }
 
     @Override protected void setup() {
@@ -119,7 +119,7 @@ class JsExprTranslator {
 
       String fnName = node.getFunctionName();
       if (ImpureFunction.forFunctionName(fnName) == null &&
-          ! soyJsSrcFunctionsMap.containsKey(fnName)) {
+          ! soyPySrcFunctionsMap.containsKey(fnName)) {
         areAllFunctionsSupported = false;
         return;  // already found an unsupported function, so don't keep looking
       }

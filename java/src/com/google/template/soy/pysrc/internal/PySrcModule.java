@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.assistedinject.FactoryProvider;
-import com.google.template.soy.jssrc.SoyJsSrcOptions;
-import com.google.template.soy.jssrc.internal.GenJsExprsVisitor.GenJsExprsVisitorFactory;
-import com.google.template.soy.jssrc.internal.TranslateToJsExprVisitor.TranslateToJsExprVisitorFactory;
-import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
-import com.google.template.soy.jssrc.restricted.SoyJsSrcPrintDirective;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.internal.GenPyExprsVisitor.GenPyExprsVisitorFactory;
+import com.google.template.soy.pysrc.internal.TranslateToPyExprVisitor.TranslateToPyExprVisitorFactory;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
+import com.google.template.soy.pysrc.restricted.SoyPySrcPrintDirective;
 import com.google.template.soy.shared.internal.ApiCallScope;
 import com.google.template.soy.shared.internal.BackendModuleUtils;
 import com.google.template.soy.shared.internal.GuiceSimpleScope;
@@ -37,13 +37,13 @@ import java.util.Set;
 
 
 /**
- * Guice module for the JS Source backend.
+ * Guice module for the Python Source backend.
  *
  * <p> Important: Do not use outside of Soy code (treat as superpackage-private).
  *
  * @author Kai Huang
  */
-public class JsSrcModule extends AbstractModule {
+public class PySrcModule extends AbstractModule {
 
 
   @Override protected void configure() {
@@ -52,46 +52,46 @@ public class JsSrcModule extends AbstractModule {
     install(new SharedModule());
 
     // Bind providers of factories (created via assisted inject).
-    bind(GenJsExprsVisitorFactory.class)
+    bind(GenPyExprsVisitorFactory.class)
         .toProvider(FactoryProvider.newFactory(
-            GenJsExprsVisitorFactory.class, GenJsExprsVisitor.class));
-    bind(TranslateToJsExprVisitorFactory.class)
+            GenPyExprsVisitorFactory.class, GenPyExprsVisitor.class));
+    bind(TranslateToPyExprVisitorFactory.class)
         .toProvider(FactoryProvider.newFactory(
-            TranslateToJsExprVisitorFactory.class, TranslateToJsExprVisitor.class));
+            TranslateToPyExprVisitorFactory.class, TranslateToPyExprVisitor.class));
 
     // Bind unscoped providers for parameters in ApiCallScope (these throw exceptions).
-    bind(SoyJsSrcOptions.class)
-        .toProvider(GuiceSimpleScope.<SoyJsSrcOptions>getUnscopedProvider())
+    bind(SoyPySrcOptions.class)
+        .toProvider(GuiceSimpleScope.<SoyPySrcOptions>getUnscopedProvider())
         .in(ApiCallScope.class);
   }
 
 
   /**
-   * Builds and provides the map of SoyJsSrcFunctions (name to function).
+   * Builds and provides the map of SoyPySrcFunctions (name to function).
    * @param soyFunctionsSet The installed set of SoyFunctions (from Guice Multibinder). Each
-   *     SoyFunction may or may not implement SoyJsSrcFunction.
+   *     SoyFunction may or may not implement SoyPySrcFunction.
    */
   @Provides
   @Singleton
-  Map<String, SoyJsSrcFunction> provideSoyJsSrcFunctionsMap(Set<SoyFunction> soyFunctionsSet) {
+  Map<String, SoyPySrcFunction> provideSoyPySrcFunctionsMap(Set<SoyFunction> soyFunctionsSet) {
 
     return BackendModuleUtils.buildBackendSpecificSoyFunctionsMap(
-        SoyJsSrcFunction.class, soyFunctionsSet);
+        SoyPySrcFunction.class, soyFunctionsSet);
   }
 
 
   /**
-   * Builds and provides the map of SoyJsSrcDirectives (name to directive).
+   * Builds and provides the map of SoyPySrcDirectives (name to directive).
    * @param soyDirectivesSet The installed set of SoyDirectives (from Guice Multibinder). Each
-   *     SoyDirective may or may not implement SoyJsSrcDirective.
+   *     SoyDirective may or may not implement SoyPySrcDirective.
    */
   @Provides
   @Singleton
-  Map<String, SoyJsSrcPrintDirective> provideSoyJsSrcDirectivesMap(
+  Map<String, SoyPySrcPrintDirective> provideSoyPySrcDirectivesMap(
       Set<SoyPrintDirective> soyDirectivesSet) {
 
     return BackendModuleUtils.buildBackendSpecificSoyDirectivesMap(
-        SoyJsSrcPrintDirective.class, soyDirectivesSet);
+        SoyPySrcPrintDirective.class, soyDirectivesSet);
   }
 
 }

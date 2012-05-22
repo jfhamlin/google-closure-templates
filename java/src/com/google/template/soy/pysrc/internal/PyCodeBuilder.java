@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.google.template.soy.jssrc.internal;
+package com.google.template.soy.pysrc.internal;
 
 import com.google.template.soy.base.SoySyntaxException;
 import com.google.template.soy.internal.base.Pair;
-import com.google.template.soy.jssrc.SoyJsSrcOptions.CodeStyle;
-import com.google.template.soy.jssrc.restricted.JsExpr;
-import com.google.template.soy.jssrc.restricted.JsExprUtils;
+import com.google.template.soy.pysrc.SoyPySrcOptions.CodeStyle;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.PyExprUtils;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -28,30 +28,30 @@ import java.util.List;
 
 
 /**
- * A class for building JS code.
+ * A class for building Python code.
  *
  * <p> Usage example that demonstrates most of the methods:
  * <pre>
- *   JsCodeBuilder jcb = new JsCodeBuilder(CodeStyle.STRINGBUILDER);
+ *   PyCodeBuilder jcb = new PyCodeBuilder(CodeStyle.STRINGBUILDER);
  *   jcb.appendLine("story.title = function(opt_data) {");
  *   jcb.increaseIndent();
  *   jcb.pushOutputVar("output");
  *   jcb.initOutputVarIfNecessary();
  *   jcb.pushOutputVar("temp");
  *   jcb.addToOutputVar(Lists.newArrayList(
- *       new JsExpr("'Snow White and the '", Integer.MAX_VALUE),
- *       new JsExpr("opt_data.numDwarfs", Integer.MAX_VALUE));
+ *       new PyExpr("'Snow White and the '", Integer.MAX_VALUE),
+ *       new PyExpr("opt_data.numDwarfs", Integer.MAX_VALUE));
  *   jcb.popOutputVar();
  *   jcb.addToOutputVar(Lists.newArrayList(
- *       new JsExpr("temp", Integer.MAX_VALUE),
- *       new JsExpr("' Dwarfs'", Integer.MAX_VALUE));
+ *       new PyExpr("temp", Integer.MAX_VALUE),
+ *       new PyExpr("' Dwarfs'", Integer.MAX_VALUE));
  *   jcb.indent().append("return ").appendOutputVarName().append(".toString();\n");
  *   jcb.popOutputVar();
  *   jcb.decreaseIndent();
  *   String THE_END = "the end";
  *   jcb.appendLine("}  // ", THE_END);
  * </pre>
- * The above example builds the following JS code:
+ * The above example builds the following Python code:
  * <pre>
  * story.title = function(opt_data) {
  *   var output = new soy.StringBuilder();
@@ -63,7 +63,7 @@ import java.util.List;
  *
  * @author Kai Huang
  */
-class JsCodeBuilder {
+class PyCodeBuilder {
 
 
   /** Used by {@code increaseIndent()} and {@code decreaseIndent()}. */
@@ -94,7 +94,7 @@ class JsCodeBuilder {
    *
    * @param codeStyle The code style to use.
    */
-  public JsCodeBuilder(CodeStyle codeStyle) {
+  public PyCodeBuilder(CodeStyle codeStyle) {
     this.codeStyle = codeStyle;
     code = new StringBuilder();
     indent = "";
@@ -158,7 +158,7 @@ class JsCodeBuilder {
 
 
   /**
-   * Tells this JsCodeBuilder that the current output variable has already been initialized. This
+   * Tells this PyCodeBuilder that the current output variable has already been initialized. This
    * causes {@code initOutputVarIfNecessary} and {@code addToOutputVar} to not add initialization
    * code even on the first use of the variable.
    */
@@ -171,9 +171,9 @@ class JsCodeBuilder {
 
   /**
    * Appends the current indent to the generated code.
-   * @return This JsCodeBuilder (for stringing together operations).
+   * @return This PyCodeBuilder (for stringing together operations).
    */
-  public JsCodeBuilder indent() {
+  public PyCodeBuilder indent() {
     code.append(indent);
     return this;
   }
@@ -181,25 +181,25 @@ class JsCodeBuilder {
 
   /**
    * Appends one or more strings to the generated code.
-   * @param jsCodeFragments The code string(s) to append.
-   * @return This JsCodeBuilder (for stringing together operations).
+   * @param pyCodeFragments The code string(s) to append.
+   * @return This PyCodeBuilder (for stringing together operations).
    */
-  public JsCodeBuilder append(String... jsCodeFragments) {
-    for (String jsCodeFragment : jsCodeFragments) {
-      code.append(jsCodeFragment);
+  public PyCodeBuilder append(String... pyCodeFragments) {
+    for (String pyCodeFragment : pyCodeFragments) {
+      code.append(pyCodeFragment);
     }
     return this;
   }
 
 
   /**
-   * Equvalent to jsCodeBuilder.indent().append(jsCodeFragments).append("\n");
-   * @param jsCodeFragments The code string(s) to append.
-   * @return This JsCodeBuilder (for stringing together operations).
+   * Equvalent to pyCodeBuilder.indent().append(pyCodeFragments).append("\n");
+   * @param pyCodeFragments The code string(s) to append.
+   * @return This PyCodeBuilder (for stringing together operations).
    */
-  public JsCodeBuilder appendLine(String... jsCodeFragments) {
+  public PyCodeBuilder appendLine(String... pyCodeFragments) {
     indent();
-    append(jsCodeFragments);
+    append(pyCodeFragments);
     code.append("\n");
     return this;
   }
@@ -207,9 +207,9 @@ class JsCodeBuilder {
 
   /**
    * Appends the name of the current output variable.
-   * @return This JsCodeBuilder (for stringing together operations).
+   * @return This PyCodeBuilder (for stringing together operations).
    */
-  public JsCodeBuilder appendOutputVarName() {
+  public PyCodeBuilder appendOutputVarName() {
     code.append(currOutputVarName);
     return this;
   }
@@ -227,53 +227,53 @@ class JsCodeBuilder {
 
     if (codeStyle == CodeStyle.STRINGBUILDER) {
       // var output = new soy.StringBuilder();
-      appendLine("var ", currOutputVarName, " = new soy.StringBuilder();");
+      appendLine(currOutputVarName, " = pysoy.StringBuilder()");
     } else {
       // var output = '';
-      appendLine("var ", currOutputVarName, " = '';");
+      appendLine(currOutputVarName, " = ''");
     }
     setOutputVarInited();
   }
 
 
   /**
-   * Appends a line/statement with the given concatenation of the given JS expressions saved to the
+   * Appends a line/statement with the given concatenation of the given Python expressions saved to the
    * current output variable.
-   * @param jsExprs One or more JS expressions to compute output.
+   * @param pyExprs One or more Python expressions to compute output.
    */
-  public void addToOutputVar(List<JsExpr> jsExprs) {
+  public void addToOutputVar(List<PyExpr> pyExprs) {
 
     if (codeStyle == CodeStyle.STRINGBUILDER) {
-      StringBuilder commaSeparatedJsExprsSb = new StringBuilder();
+      StringBuilder commaSeparatedPyExprsSb = new StringBuilder();
       boolean isFirst = true;
-      for (JsExpr jsExpr : jsExprs) {
+      for (PyExpr pyExpr : pyExprs) {
         if (isFirst) {
           isFirst = false;
         } else {
-          commaSeparatedJsExprsSb.append(", ");
+          commaSeparatedPyExprsSb.append(", ");
         }
-        commaSeparatedJsExprsSb.append(jsExpr.getText());
+        commaSeparatedPyExprsSb.append(pyExpr.getText());
       }
 
       if (currOutputVarIsInited) {
         // output.append(AAA, BBB);
-        appendLine(currOutputVarName, ".append(", commaSeparatedJsExprsSb.toString(), ");");
+        appendLine(currOutputVarName, ".append(", commaSeparatedPyExprsSb.toString(), ")");
       } else {
         // var output = new soy.StringBuilder(AAA, BBB);
-        appendLine("var ", currOutputVarName, " = new soy.StringBuilder(",
-                   commaSeparatedJsExprsSb.toString(), ");");
+        appendLine(currOutputVarName, " = pysoy.StringBuilder(",
+                   commaSeparatedPyExprsSb.toString(), ")");
         setOutputVarInited();
       }
 
     } else {  // CodeStyle.CONCAT
-      JsExpr concatenatedJsExprs = JsExprUtils.concatJsExprs(jsExprs);
+      PyExpr concatenatedPyExprs = PyExprUtils.concatPyExprs(pyExprs);
 
       if (currOutputVarIsInited) {
         // output += AAA + BBB + CCC;
-        appendLine(currOutputVarName, " += ", concatenatedJsExprs.getText(), ";");
+        appendLine(currOutputVarName, " += ", concatenatedPyExprs.getText());
       } else {
         // var output = AAA + BBB + CCC;
-        appendLine("var ", currOutputVarName, " = ", concatenatedJsExprs.getText(), ";");
+        appendLine("var ", currOutputVarName, " = ", concatenatedPyExprs.getText());
         setOutputVarInited();
       }
     }
