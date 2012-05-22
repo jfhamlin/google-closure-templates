@@ -1,0 +1,3 @@
+GLOBAL_STR = '23'
+GLOBAL_INT = 42
+GLOBAL_BOOL = true
