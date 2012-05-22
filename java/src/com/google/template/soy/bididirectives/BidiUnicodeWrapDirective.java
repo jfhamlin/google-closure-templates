@@ -24,6 +24,8 @@ import com.google.template.soy.data.SoyData;
 import com.google.template.soy.internal.i18n.SoyBidiUtils;
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcPrintDirective;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcPrintDirective;
 import com.google.template.soy.shared.restricted.ApiCallScopeBindingAnnotations.BidiGlobalDir;
 import com.google.template.soy.tofu.restricted.SoyTofuPrintDirective;
 
@@ -41,7 +43,8 @@ import java.util.Set;
  * @author Aharon Lanin
  */
 @Singleton
-public class BidiUnicodeWrapDirective implements SoyTofuPrintDirective, SoyJsSrcPrintDirective {
+public class BidiUnicodeWrapDirective implements SoyTofuPrintDirective, SoyJsSrcPrintDirective,
+                                                 SoyPySrcPrintDirective {
 
 
   /** Provider for the current bidi global directionality. */
@@ -81,6 +84,13 @@ public class BidiUnicodeWrapDirective implements SoyTofuPrintDirective, SoyJsSrc
   @Override public JsExpr applyForJsSrc(JsExpr str, List<JsExpr> args) {
     return new JsExpr(
         "soy.$$bidiUnicodeWrap(" + bidiGlobalDirProvider.get() + ", " + str.getText() + ")",
+        Integer.MAX_VALUE);
+  }
+
+
+  @Override public PyExpr applyForPySrc(PyExpr str, List<PyExpr> args) {
+    return new PyExpr(
+        "pysoy.bidi_unicode_wrap(" + bidiGlobalDirProvider.get() + ", " + str.getText() + ")",
         Integer.MAX_VALUE);
   }
 

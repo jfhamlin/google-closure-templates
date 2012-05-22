@@ -24,6 +24,8 @@ import com.google.template.soy.javasrc.restricted.JavaExpr;
 import com.google.template.soy.javasrc.restricted.SoyJavaSrcPrintDirective;
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcPrintDirective;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcPrintDirective;
 import com.google.template.soy.tofu.restricted.SoyTofuPrintDirective;
 
 import java.util.List;
@@ -38,7 +40,8 @@ import java.util.Set;
  */
 @Singleton
 public class IdDirective
-    implements SoyTofuPrintDirective, SoyJsSrcPrintDirective, SoyJavaSrcPrintDirective {
+    implements SoyTofuPrintDirective, SoyJsSrcPrintDirective,
+               SoyPySrcPrintDirective, SoyJavaSrcPrintDirective {
 
 
   public static final String NAME = "|id";
@@ -72,6 +75,9 @@ public class IdDirective
     return str;
   }
 
+  @Override public PyExpr applyForPySrc(PyExpr str, List<PyExpr> args) {
+    return str;
+  }
 
   @Override public JavaExpr applyForJavaSrc(JavaExpr str, List<JavaExpr> args) {
     return str;

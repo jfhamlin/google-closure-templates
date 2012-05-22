@@ -27,6 +27,8 @@ import com.google.template.soy.javasrc.restricted.SoyJavaSrcFunction;
 import static com.google.template.soy.javasrc.restricted.SoyJavaSrcFunctionUtils.toIntegerJavaExpr;
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.tofu.restricted.SoyTofuFunction;
 import static com.google.template.soy.tofu.restricted.SoyTofuFunctionUtils.toSoyData;
 
@@ -40,7 +42,8 @@ import java.util.Set;
  * @author Kai Huang
  */
 @Singleton
-class CeilingFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFunction {
+class CeilingFunction implements SoyTofuFunction, SoyJsSrcFunction,
+                                 SoyPySrcFunction, SoyJavaSrcFunction {
 
 
   @Inject
@@ -72,6 +75,13 @@ class CeilingFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFu
     JsExpr arg = args.get(0);
 
     return new JsExpr("Math.ceil(" + arg.getText() + ")", Integer.MAX_VALUE);
+  }
+
+
+  @Override public PyExpr computeForPySrc(List<PyExpr> args) {
+    PyExpr arg = args.get(0);
+
+    return new PyExpr("math.ceil(" + arg.getText() + ")", Integer.MAX_VALUE);
   }
 
 

@@ -22,8 +22,14 @@ import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.google.template.soy.data.SoyData;
 import com.google.template.soy.internal.i18n.SoyBidiUtils;
+import com.google.template.soy.javasrc.restricted.JavaCodeUtils;
+import com.google.template.soy.javasrc.restricted.JavaExpr;
+import com.google.template.soy.javasrc.restricted.SoyJavaSrcFunction;
+import static com.google.template.soy.javasrc.restricted.SoyJavaSrcFunctionUtils.toUnknownJavaExpr;
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.shared.restricted.ApiCallScopeBindingAnnotations.BidiGlobalDir;
 import com.google.template.soy.tofu.restricted.SoyTofuFunction;
 import static com.google.template.soy.tofu.restricted.SoyTofuFunctionUtils.toSoyData;
@@ -43,7 +49,8 @@ import java.util.Set;
  * @author Kai Huang
  */
 @Singleton
-class BidiDirAttrFunction implements SoyTofuFunction, SoyJsSrcFunction {
+class BidiDirAttrFunction implements SoyTofuFunction, SoyJsSrcFunction,
+                                     SoyPySrcFunction, SoyJavaSrcFunction {
 
 
   /** Provider for the current bidi global directionality. */
@@ -88,6 +95,36 @@ class BidiDirAttrFunction implements SoyTofuFunction, SoyJsSrcFunction {
         (isHtml != null ? ", " + isHtml.getText() : "") + ")";
 
     return new JsExpr(callText, Integer.MAX_VALUE);
+  }
+
+
+  @Override public PyExpr computeForPySrc(List<PyExpr> args) {
+    PyExpr text = args.get(0);
+    PyExpr isHtml = (args.size() == 2) ? args.get(1) : null;
+
+    String callText =
+        "pysoy.bidi_dir_attr(" + bidiGlobalDirProvider.get() + ", " + text.getText() +
+        (isHtml != null ? ", " + isHtml.getText() : "") + ")";
+
+    return new PyExpr(callText, Integer.MAX_VALUE);
+  }
+
+
+  @Override public JavaExpr computeForJavaSrc(List<JavaExpr> args) {
+    JavaExpr text = args.get(0);
+    JavaExpr isHtml = (args.size() == 2) ? args.get(1) : null;
+
+    if (isHtml != null) {
+      return toUnknownJavaExpr(
+              JavaCodeUtils.genFunctionCall(
+                      JavaCodeUtils.UTILS_LIB + ".$$bidiDirAttr",
+                      bidiGlobalDirProvider.get().toString(), text.getText(), isHtml.getText()));
+    } else {
+      return toUnknownJavaExpr(
+              JavaCodeUtils.genFunctionCall(
+                      JavaCodeUtils.UTILS_LIB + ".$$bidiDirAttr",
+                      bidiGlobalDirProvider.get().toString(), text.getText()));
+    }
   }
 
 }

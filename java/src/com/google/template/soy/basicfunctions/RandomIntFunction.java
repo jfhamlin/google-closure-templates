@@ -29,6 +29,9 @@ import static com.google.template.soy.javasrc.restricted.SoyJavaSrcFunctionUtils
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsCodeUtils;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPyCodeUtils;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.tofu.restricted.SoyTofuFunction;
 import static com.google.template.soy.tofu.restricted.SoyTofuFunctionUtils.toSoyData;
 
@@ -42,8 +45,8 @@ import java.util.Set;
  * @author Kai Huang
  */
 @Singleton
-class RandomIntFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFunction {
-
+class RandomIntFunction implements SoyTofuFunction, SoyJsSrcFunction,
+                                   SoyPySrcFunction, SoyJavaSrcFunction {
 
   @Inject
   RandomIntFunction() {}
@@ -73,6 +76,14 @@ class RandomIntFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrc
     JsExpr randomTimesArg =
         SoyJsCodeUtils.genJsExprUsingSoySyntax(Operator.TIMES, Lists.newArrayList(random, arg));
     return new JsExpr("Math.floor(" + randomTimesArg.getText() + ")", Integer.MAX_VALUE);
+  }
+
+
+  @Override public PyExpr computeForPySrc(List<PyExpr> args) {
+    PyExpr arg = args.get(0);
+
+    return new PyExpr("pysoy.random_int(" + arg.getText() + ")",
+                      Integer.MAX_VALUE);
   }
 
 

@@ -27,6 +27,8 @@ import com.google.template.soy.javasrc.restricted.SoyJavaSrcFunction;
 import static com.google.template.soy.javasrc.restricted.SoyJavaSrcFunctionUtils.toIntegerJavaExpr;
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.tofu.restricted.SoyTofuFunction;
 import static com.google.template.soy.tofu.restricted.SoyTofuFunctionUtils.toSoyData;
 
@@ -40,7 +42,8 @@ import java.util.Set;
  * @author Kai Huang
  */
 @Singleton
-class LengthFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFunction {
+class LengthFunction implements SoyTofuFunction, SoyJsSrcFunction,
+                                SoyPySrcFunction, SoyJavaSrcFunction {
 
 
   @Inject
@@ -73,6 +76,14 @@ class LengthFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFun
     String exprText = arg.getPrecedence() == Integer.MAX_VALUE ?
                       arg.getText() + ".length" : "(" + arg.getText() + ").length";
     return new JsExpr(exprText, Integer.MAX_VALUE);
+  }
+
+
+  @Override public PyExpr computeForPySrc(List<PyExpr> args) {
+    PyExpr arg = args.get(0);
+
+    String exprText = "len(" + arg.getText() + ")";
+    return new PyExpr(exprText, Integer.MAX_VALUE);
   }
 
 

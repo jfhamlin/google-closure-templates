@@ -27,6 +27,8 @@ import com.google.template.soy.javasrc.restricted.SoyJavaSrcFunction;
 import static com.google.template.soy.javasrc.restricted.SoyJavaSrcFunctionUtils.toStringJavaExpr;
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.shared.restricted.ApiCallScopeBindingAnnotations.BidiGlobalDir;
 import com.google.template.soy.tofu.restricted.SoyTofuFunction;
 import static com.google.template.soy.tofu.restricted.SoyTofuFunctionUtils.toSoyData;
@@ -43,7 +45,8 @@ import java.util.Set;
  * @author Kai Huang
  */
 @Singleton
-class BidiEndEdgeFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFunction {
+class BidiEndEdgeFunction implements SoyTofuFunction, SoyJsSrcFunction,
+                                     SoyPySrcFunction, SoyJavaSrcFunction {
 
 
   /** Provider for the current bidi global directionality. */
@@ -78,6 +81,12 @@ class BidiEndEdgeFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaS
   @Override public JsExpr computeForJsSrc(List<JsExpr> args) {
 
     return new JsExpr((bidiGlobalDirProvider.get() < 0) ? "'left'" : "'right'", Integer.MAX_VALUE);
+  }
+
+
+  @Override public PyExpr computeForPySrc(List<PyExpr> args) {
+
+    return new PyExpr((bidiGlobalDirProvider.get() < 0) ? "'left'" : "'right'", Integer.MAX_VALUE);
   }
 
 

@@ -121,6 +121,19 @@ Author: Neil Sanchala
   </target>
 
 
+  <!-- Target to create a standalone executable SoyToPySrcCompiler.jar. -->
+  <target name="SoyToPySrcCompiler"
+          depends="jar"
+          description="Creates a standalone executable SoyToPySrcCompiler.jar.">
+    <jar destfile="${build.dir}/SoyToPySrcCompiler.jar" update="true">
+      <manifest>
+        <attribute name="Main-Class" value="com.google.template.soy.SoyToPySrcCompiler" />
+      </manifest>
+      <zipfileset src="${soy.jar.file}" />
+    </jar>
+  </target>
+
+
   <!-- Target to create a standalone executable SoyParseInfoGenerator.jar. -->
   <target name="SoyParseInfoGenerator"
           depends="jar"

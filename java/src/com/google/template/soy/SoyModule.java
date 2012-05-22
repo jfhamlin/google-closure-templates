@@ -24,6 +24,7 @@ import com.google.template.soy.basicfunctions.BasicFunctionsModule;
 import com.google.template.soy.bididirectives.BidiDirectivesModule;
 import com.google.template.soy.bidifunctions.BidiFunctionsModule;
 import com.google.template.soy.javasrc.internal.JavaSrcModule;
+import com.google.template.soy.pysrc.internal.PySrcModule;
 import com.google.template.soy.jssrc.internal.JsSrcModule;
 import com.google.template.soy.shared.internal.SharedModule;
 import com.google.template.soy.tofu.internal.TofuModule;
@@ -42,6 +43,7 @@ public class SoyModule extends AbstractModule {
     // Install requisite modules.
     install(new SharedModule());
     install(new TofuModule());
+    install(new PySrcModule());
     install(new JsSrcModule());
     install(new JavaSrcModule());
 

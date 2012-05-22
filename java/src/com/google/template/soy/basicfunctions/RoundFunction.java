@@ -31,6 +31,9 @@ import static com.google.template.soy.javasrc.restricted.SoyJavaSrcFunctionUtils
 import com.google.template.soy.jssrc.restricted.JsExpr;
 import com.google.template.soy.jssrc.restricted.SoyJsCodeUtils;
 import com.google.template.soy.jssrc.restricted.SoyJsSrcFunction;
+import com.google.template.soy.pysrc.restricted.PyExpr;
+import com.google.template.soy.pysrc.restricted.SoyPyCodeUtils;
+import com.google.template.soy.pysrc.restricted.SoyPySrcFunction;
 import com.google.template.soy.tofu.restricted.SoyTofuFunction;
 import static com.google.template.soy.tofu.restricted.SoyTofuFunctionUtils.toSoyData;
 
@@ -45,7 +48,8 @@ import java.util.Set;
  * @author Kai Huang
  */
 @Singleton
-class RoundFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFunction {
+class RoundFunction implements SoyTofuFunction, SoyJsSrcFunction,
+                               SoyPySrcFunction, SoyJavaSrcFunction {
 
 
   @Inject
@@ -129,6 +133,31 @@ class RoundFunction implements SoyTofuFunction, SoyJsSrcFunction, SoyJavaSrcFunc
       throw new IllegalArgumentException(
           "Second argument to round() function is " + numDigitsAfterPtAsInt +
           ", which is too large in magnitude.");
+    }
+  }
+
+
+  @Override public PyExpr computeForPySrc(List<PyExpr> args) {
+    PyExpr value = args.get(0);
+    PyExpr numDigitsAfterPt = (args.size() == 2) ? args.get(1) : null;
+
+    int numDigitsAfterPtAsInt = 0;
+    if (numDigitsAfterPt != null) {
+      try {
+        numDigitsAfterPtAsInt = Integer.parseInt(numDigitsAfterPt.getText());
+      } catch (NumberFormatException nfe) {
+        numDigitsAfterPtAsInt = Integer.MIN_VALUE;  // indicates it's not a simple integer literal
+      }
+    }
+
+    if (numDigitsAfterPtAsInt == 0) {
+      // Case 1: round() has only one argument or the second argument is 0.
+      return new PyExpr("round(" + value.getText() + ")", Integer.MAX_VALUE);
+
+    } else {
+      return new PyExpr("round(" + value.getText() + ", " +
+                        numDigitsAfterPt.getText() + ")", Integer.MAX_VALUE);
+
     }
   }
 

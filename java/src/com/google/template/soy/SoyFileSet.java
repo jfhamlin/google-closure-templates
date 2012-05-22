@@ -30,6 +30,8 @@ import com.google.template.soy.base.SoySyntaxException;
 import com.google.template.soy.javasrc.SoyJavaSrcOptions;
 import com.google.template.soy.javasrc.internal.JavaSrcMain;
 import com.google.template.soy.jssrc.SoyJsSrcOptions;
+import com.google.template.soy.pysrc.SoyPySrcOptions;
+import com.google.template.soy.pysrc.internal.PySrcMain;
 import com.google.template.soy.jssrc.internal.JsSrcMain;
 import com.google.template.soy.jssrc.internal.JsSrcUtils;
 import com.google.template.soy.msgs.SoyMsgBundle;
@@ -332,6 +334,9 @@ public final class SoyFileSet {
   /** Factory for creating an instance of BaseTofu. */
   private final BaseTofuFactory baseTofuFactory;
 
+  /** Provider for getting an instance of PySrcMain. */
+  private final Provider<PySrcMain> pySrcMainProvider;
+
   /** Provider for getting an instance of JsSrcMain. */
   private final Provider<JsSrcMain> jsSrcMainProvider;
 
@@ -358,6 +363,7 @@ public final class SoyFileSet {
    */
   @Inject
   SoyFileSet(BaseTofuFactory baseTofuFactory, Provider<JsSrcMain> jsSrcMainProvider,
+             Provider<PySrcMain> pySrcMainProvider,
              Provider<JavaSrcMain> javaSrcMainProvider,
              PerformAutoescapeVisitor performAutoescapeVisitor,
              @Assisted List<SoyFileSupplier> soyFileSuppliers,
@@ -368,6 +374,7 @@ public final class SoyFileSet {
 
     this.baseTofuFactory = baseTofuFactory;
     this.jsSrcMainProvider = jsSrcMainProvider;
+    this.pySrcMainProvider = pySrcMainProvider;
     this.javaSrcMainProvider = javaSrcMainProvider;
     this.performAutoescapeVisitor = performAutoescapeVisitor;
 
@@ -503,7 +510,6 @@ public final class SoyFileSet {
     return jsSrcMainProvider.get().genJsSrc(soyTree, jsSrcOptions, msgBundle);
   }
 
-
   /**
    * Compiles this Soy file set into JS source code files and writes these JS files to disk.
    *
@@ -557,6 +563,15 @@ public final class SoyFileSet {
     }
   }
 
+  void compileToPySrcFiles(
+      String outputPathFormat, String inputFilePathPrefix, SoyPySrcOptions pySrcOptions,
+      List<String> locales, @Nullable String messageFilePathFormat)
+          throws SoySyntaxException, IOException {
+    SoyFileSetNode soyTree = parse();
+
+    pySrcMainProvider.get().genPyFiles(
+        soyTree, pySrcOptions, null, null, outputPathFormat, inputFilePathPrefix);
+  }
 
   /**
    * Parses the files in this Soy file set and returns the combined parse tree.
